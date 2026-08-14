@@ -13,3 +13,6 @@ Cargo.lock
 __pycache__/
 *.pyc
 
+# 归档的 aarch64 固件（二进制，不提交；README 和脚本保留）
+/archived/aarch64/firmware/
+

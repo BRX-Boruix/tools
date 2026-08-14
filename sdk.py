@@ -7,7 +7,7 @@ BORUIX SDK 辅助工具主入口。
 
 子命令:
     limine   下载并部署 Limine bootloader 到 sdk/boot/
-    build    编译内核并生成可引导 ISO
+    build    编译内核并生成可引导 ISO（x86_64）
     run      用 QEMU 启动 ISO
     --help   查看帮助
 """
@@ -31,12 +31,8 @@ PROJECT_ROOT = os.path.dirname(SDK_DIR)
 BOOT_DIR = os.path.join(SDK_DIR, "boot")
 LIMINE_BINARY_DIR = os.path.join(BOOT_DIR, "limine-binary")
 KERNEL_DIR = os.path.join(PROJECT_ROOT, "kernel")
-KERNEL_ELF = os.path.join(
-    KERNEL_DIR, "target", "x86_64-unknown-none", "debug", "kernel"
-)
 LIMINE_CONF = os.path.join(SDK_DIR, "limine.conf")
 LIMINE_TOOL = os.path.join(LIMINE_BINARY_DIR, "limine-tool-windows-x86", "limine.exe")
-OUTPUT_ISO = os.path.join(PROJECT_ROOT, "boruix.iso")
 ENV_FILE = os.path.join(PROJECT_ROOT, ".env")
 
 # Limine GitHub release 二进制下载地址
@@ -44,6 +40,8 @@ LIMINE_RELEASES = "https://github.com/Limine-Bootloader/Limine/releases/download
 DEFAULT_LIMINE_VERSION = "12.5.2"
 
 TARGET = "x86_64-unknown-none"
+QEMU = "qemu-system-x86_64"
+OUTPUT_ISO = os.path.join(PROJECT_ROOT, "boruix.iso")
 
 
 # ---------------------------------------------------------------------------
@@ -103,7 +101,6 @@ def cmd_limine(args: argparse.Namespace) -> int:
         return 0
 
     if args.force and os.path.isdir(LIMINE_BINARY_DIR):
-        import shutil
         info(f"删除旧版本: {LIMINE_BINARY_DIR}")
         shutil.rmtree(LIMINE_BINARY_DIR)
 
@@ -111,28 +108,22 @@ def cmd_limine(args: argparse.Namespace) -> int:
 
     # 优先用 zip（Windows 友好）
     zip_url = f"{LIMINE_RELEASES}/v{version}/limine-binary.zip"
-    archive_url = zip_url
-    is_zip = True
 
     with tempfile.TemporaryDirectory() as tmp:
-        archive_path = os.path.join(tmp, "limine-binary.archive")
+        archive_path = os.path.join(tmp, "limine-binary.zip")
         try:
-            _download(archive_url, archive_path)
+            _download(zip_url, archive_path)
         except Exception as e:
             err(f"下载失败: {e}")
             return 1
 
         try:
-            if is_zip:
-                _extract_zip(archive_path, BOOT_DIR)
-            else:
-                _extract_tar(archive_path, BOOT_DIR)
+            _extract_zip(archive_path, BOOT_DIR)
         except Exception as e:
             err(f"解压失败: {e}")
             return 1
 
     if not os.path.isdir(LIMINE_BINARY_DIR):
-        # zip 解压后应产生 limine-binary/ 目录
         err("解压后未找到 limine-binary/ 目录，部署可能不完整")
         return 1
 
@@ -144,6 +135,10 @@ def cmd_limine(args: argparse.Namespace) -> int:
 # build 子命令
 # ---------------------------------------------------------------------------
 
+def _kernel_elf() -> str:
+    return os.path.join(KERNEL_DIR, "target", TARGET, "debug", "kernel")
+
+
 def _cargo_build_kernel() -> int:
     """编译内核为 ELF"""
     info(f"编译内核 (target={TARGET})")
@@ -152,10 +147,11 @@ def _cargo_build_kernel() -> int:
     if r.returncode != 0:
         err("内核编译失败")
         return r.returncode
-    if not os.path.isfile(KERNEL_ELF):
-        err(f"未找到内核 ELF: {KERNEL_ELF}")
+    elf = _kernel_elf()
+    if not os.path.isfile(elf):
+        err(f"未找到内核 ELF: {elf}")
         return 1
-    info(f"内核 ELF: {KERNEL_ELF}")
+    info(f"内核 ELF: {elf}")
     return 0
 
 
@@ -168,7 +164,7 @@ def _make_iso() -> int:
     os.makedirs(os.path.join(iso_root, "EFI", "BOOT"), exist_ok=True)
 
     # 拷贝内核
-    shutil.copy(KERNEL_ELF, os.path.join(iso_root, "boot", "kernel"))
+    shutil.copy(_kernel_elf(), os.path.join(iso_root, "boot", "kernel"))
     # 拷贝 limine.conf
     shutil.copy(LIMINE_CONF, os.path.join(iso_root, "boot", "limine", "limine.conf"))
 
@@ -231,11 +227,12 @@ def _find_qemu() -> str:
     """定位 qemu-system-x86_64：优先 .env 的 QEMU_DIR，其次 PATH。"""
     env = load_env()
     qemu_dir = env.get("QEMU_DIR")
+    exe = QEMU + ".exe"
     if qemu_dir:
-        candidate = os.path.join(qemu_dir, "qemu-system-x86_64.exe")
+        candidate = os.path.join(qemu_dir, exe)
         if os.path.isfile(candidate):
             return candidate
-    on_path = shutil.which("qemu-system-x86_64")
+    on_path = shutil.which(QEMU)
     if on_path:
         return on_path
     return ""
@@ -249,7 +246,7 @@ def cmd_run(args: argparse.Namespace) -> int:
 
     qemu = _find_qemu()
     if not qemu:
-        err("未找到 QEMU，请在 .env 配置 QEMU_DIR 或加入 PATH")
+        err(f"未找到 {QEMU}，请在 .env 配置 QEMU_DIR 或加入 PATH")
         return 1
 
     cmd = [qemu, "-cdrom", OUTPUT_ISO, "-m", str(args.mem)]
