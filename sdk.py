@@ -7,6 +7,8 @@ BORUIX SDK 辅助工具主入口。
 
 子命令:
     limine   下载并部署 Limine bootloader 到 sdk/boot/
+    build    编译内核并生成可引导 ISO
+    run      用 QEMU 启动 ISO
     --help   查看帮助
 """
 
@@ -35,12 +37,31 @@ KERNEL_ELF = os.path.join(
 LIMINE_CONF = os.path.join(SDK_DIR, "limine.conf")
 LIMINE_TOOL = os.path.join(LIMINE_BINARY_DIR, "limine-tool-windows-x86", "limine.exe")
 OUTPUT_ISO = os.path.join(PROJECT_ROOT, "boruix.iso")
+ENV_FILE = os.path.join(PROJECT_ROOT, ".env")
 
 # Limine GitHub release 二进制下载地址
 LIMINE_RELEASES = "https://github.com/Limine-Bootloader/Limine/releases/download"
 DEFAULT_LIMINE_VERSION = "12.5.2"
 
 TARGET = "x86_64-unknown-none"
+
+
+# ---------------------------------------------------------------------------
+# 环境变量读取（.env）
+# ---------------------------------------------------------------------------
+
+def load_env() -> dict:
+    """读取项目根目录 .env 文件为 dict。"""
+    env = {}
+    if os.path.isfile(ENV_FILE):
+        with open(ENV_FILE, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, _, value = line.partition("=")
+                env[key.strip()] = value.strip().strip('"').strip("'")
+    return env
 
 
 # ---------------------------------------------------------------------------
@@ -203,6 +224,42 @@ def cmd_build(args: argparse.Namespace) -> int:
 
 
 # ---------------------------------------------------------------------------
+# run 子命令
+# ---------------------------------------------------------------------------
+
+def _find_qemu() -> str:
+    """定位 qemu-system-x86_64：优先 .env 的 QEMU_DIR，其次 PATH。"""
+    env = load_env()
+    qemu_dir = env.get("QEMU_DIR")
+    if qemu_dir:
+        candidate = os.path.join(qemu_dir, "qemu-system-x86_64.exe")
+        if os.path.isfile(candidate):
+            return candidate
+    on_path = shutil.which("qemu-system-x86_64")
+    if on_path:
+        return on_path
+    return ""
+
+
+def cmd_run(args: argparse.Namespace) -> int:
+    """用 QEMU 启动 ISO"""
+    if not os.path.isfile(OUTPUT_ISO):
+        err(f"未找到 ISO: {OUTPUT_ISO}，请先运行 build")
+        return 1
+
+    qemu = _find_qemu()
+    if not qemu:
+        err("未找到 QEMU，请在 .env 配置 QEMU_DIR 或加入 PATH")
+        return 1
+
+    cmd = [qemu, "-cdrom", OUTPUT_ISO, "-m", str(args.mem)]
+    if args.serial:
+        cmd += ["-serial", "stdio"]
+    info(f"启动 QEMU: {os.path.basename(qemu)}")
+    return subprocess.run(cmd).returncode
+
+
+# ---------------------------------------------------------------------------
 # 主入口
 # ---------------------------------------------------------------------------
 
@@ -235,6 +292,12 @@ def main() -> int:
     # build 子命令
     p_build = sub.add_parser("build", help="编译内核并生成可引导 ISO")
     p_build.set_defaults(func=cmd_build)
+
+    # run 子命令
+    p_run = sub.add_parser("run", help="用 QEMU 启动 ISO")
+    p_run.add_argument("--mem", default="128M", help="内存大小（默认 128M）")
+    p_run.add_argument("--serial", action="store_true", help="启用串口输出到终端")
+    p_run.set_defaults(func=cmd_run)
 
     args = parser.parse_args()
     return args.func(args)
