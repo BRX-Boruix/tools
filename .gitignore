@@ -5,3 +5,6 @@ Cargo.lock
 *.iso
 *.img
 *.bin
+
+# Limine 预编译 bootloader（从 release 下载，不提交）
+/boot/
