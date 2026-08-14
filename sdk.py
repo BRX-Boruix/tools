@@ -32,7 +32,7 @@ BOOT_DIR = os.path.join(SDK_DIR, "boot")
 LIMINE_BINARY_DIR = os.path.join(BOOT_DIR, "limine-binary")
 KERNEL_DIR = os.path.join(PROJECT_ROOT, "kernel")
 KERNEL_ELF = os.path.join(
-    KERNEL_DIR, "target", "x86_64-unknown-none", "debug", "kernel"
+    KERNEL_DIR, "target", "x86_64-unknown-none", "debug", "boruix-kernel"
 )
 LIMINE_CONF = os.path.join(SDK_DIR, "limine.conf")
 LIMINE_TOOL = os.path.join(LIMINE_BINARY_DIR, "limine-tool-windows-x86", "limine.exe")
