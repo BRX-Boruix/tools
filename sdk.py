@@ -12,6 +12,8 @@ BORUIX SDK 辅助工具主入口。
 
 import argparse
 import os
+import shutil
+import subprocess
 import sys
 import tarfile
 import tempfile
@@ -26,10 +28,19 @@ SDK_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(SDK_DIR)
 BOOT_DIR = os.path.join(SDK_DIR, "boot")
 LIMINE_BINARY_DIR = os.path.join(BOOT_DIR, "limine-binary")
+KERNEL_DIR = os.path.join(PROJECT_ROOT, "kernel")
+KERNEL_ELF = os.path.join(
+    KERNEL_DIR, "target", "x86_64-unknown-none", "debug", "kernel"
+)
+LIMINE_CONF = os.path.join(SDK_DIR, "limine.conf")
+LIMINE_TOOL = os.path.join(LIMINE_BINARY_DIR, "limine-tool-windows-x86", "limine.exe")
+OUTPUT_ISO = os.path.join(PROJECT_ROOT, "boruix.iso")
 
 # Limine GitHub release 二进制下载地址
 LIMINE_RELEASES = "https://github.com/Limine-Bootloader/Limine/releases/download"
 DEFAULT_LIMINE_VERSION = "12.5.2"
+
+TARGET = "x86_64-unknown-none"
 
 
 # ---------------------------------------------------------------------------
@@ -109,6 +120,89 @@ def cmd_limine(args: argparse.Namespace) -> int:
 
 
 # ---------------------------------------------------------------------------
+# build 子命令
+# ---------------------------------------------------------------------------
+
+def _cargo_build_kernel() -> int:
+    """编译内核为 ELF"""
+    info(f"编译内核 (target={TARGET})")
+    cmd = ["cargo", "build", "--target", TARGET]
+    r = subprocess.run(cmd, cwd=KERNEL_DIR)
+    if r.returncode != 0:
+        err("内核编译失败")
+        return r.returncode
+    if not os.path.isfile(KERNEL_ELF):
+        err(f"未找到内核 ELF: {KERNEL_ELF}")
+        return 1
+    info(f"内核 ELF: {KERNEL_ELF}")
+    return 0
+
+
+def _make_iso() -> int:
+    """用 xorriso 生成 BIOS+UEFI 混合引导 ISO"""
+    iso_root = os.path.join(SDK_DIR, "iso_root")
+    if os.path.isdir(iso_root):
+        shutil.rmtree(iso_root)
+    os.makedirs(os.path.join(iso_root, "boot", "limine"), exist_ok=True)
+    os.makedirs(os.path.join(iso_root, "EFI", "BOOT"), exist_ok=True)
+
+    # 拷贝内核
+    shutil.copy(KERNEL_ELF, os.path.join(iso_root, "boot", "kernel"))
+    # 拷贝 limine.conf
+    shutil.copy(LIMINE_CONF, os.path.join(iso_root, "boot", "limine", "limine.conf"))
+
+    lb = LIMINE_BINARY_DIR
+    # BIOS
+    shutil.copy(os.path.join(lb, "limine-bios-cd.bin"), os.path.join(iso_root, "boot", "limine", "limine-bios-cd.bin"))
+    shutil.copy(os.path.join(lb, "limine-bios.sys"), os.path.join(iso_root, "boot", "limine", "limine-bios.sys"))
+    # UEFI
+    shutil.copy(os.path.join(lb, "limine-uefi-cd.bin"), os.path.join(iso_root, "boot", "limine", "limine-uefi-cd.bin"))
+    shutil.copy(os.path.join(lb, "BOOTX64.EFI"), os.path.join(iso_root, "EFI", "BOOT", "BOOTX64.EFI"))
+
+    xorriso = shutil.which("xorriso") or r"C:\ffmpeg\bin\xorriso.exe"
+    if not os.path.isfile(xorriso):
+        err("未找到 xorriso，无法生成 ISO")
+        return 1
+
+    info("用 xorriso 生成 ISO ...")
+    # 用相对路径并指定 cwd=SDK_DIR，避免 xorriso 在 Windows 上处理绝对路径出错
+    cmd = [
+        xorriso, "-as", "mkisofs",
+        "-b", "boot/limine/limine-bios-cd.bin",
+        "-no-emul-boot", "-boot-load-size", "4", "-boot-info-table",
+        "--efi-boot", "boot/limine/limine-uefi-cd.bin",
+        "-efi-boot-part", "--efi-boot-image", "--protective-msdos-label",
+        "iso_root", "-o", OUTPUT_ISO,
+    ]
+    r = subprocess.run(cmd, cwd=SDK_DIR)
+    if r.returncode != 0:
+        err("xorriso 生成 ISO 失败")
+        return r.returncode
+
+    # BIOS 引导安装
+    if not os.path.isfile(LIMINE_TOOL):
+        err(f"未找到 limine 工具: {LIMINE_TOOL}")
+        return 1
+    info("运行 limine bios-install ...")
+    r = subprocess.run([LIMINE_TOOL, "bios-install", OUTPUT_ISO])
+    if r.returncode != 0:
+        err("limine bios-install 失败")
+        return r.returncode
+
+    shutil.rmtree(iso_root)
+    info(f"ISO 已生成: {OUTPUT_ISO}")
+    return 0
+
+
+def cmd_build(args: argparse.Namespace) -> int:
+    """编译内核并生成可引导 ISO"""
+    rc = _cargo_build_kernel()
+    if rc != 0:
+        return rc
+    return _make_iso()
+
+
+# ---------------------------------------------------------------------------
 # 主入口
 # ---------------------------------------------------------------------------
 
@@ -137,6 +231,10 @@ def main() -> int:
         help="强制重新下载（删除旧版本）",
     )
     p_limine.set_defaults(func=cmd_limine)
+
+    # build 子命令
+    p_build = sub.add_parser("build", help="编译内核并生成可引导 ISO")
+    p_build.set_defaults(func=cmd_build)
 
     args = parser.parse_args()
     return args.func(args)
