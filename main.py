@@ -9,6 +9,7 @@ BORUIX SDK 辅助工具统一入口。
     limine   下载并部署 Limine bootloader 到 sdk/boot/
     build    编译内核并生成可引导 ISO（x86_64）
     run      用 QEMU 启动 ISO
+    br       Build and Run：编译生成 ISO 后立即用 QEMU 启动
     --help   查看帮助
 
 各子命令的实现分散在 sdk_build/ 包中，本文件只负责入口与参数注册。
@@ -17,7 +18,7 @@ BORUIX SDK 辅助工具统一入口。
 import argparse
 import sys
 
-from sdk_build import build, limine, run
+from sdk_build import br, build, limine, run
 from sdk_build.config import DEFAULT_LIMINE_VERSION
 
 
@@ -56,6 +57,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_run.add_argument("--mem", default="128M", help="内存大小（默认 128M）")
     p_run.add_argument("--serial", action="store_true", help="启用串口输出到终端")
     p_run.set_defaults(func=run.cmd)
+
+    # br 子命令：Build and Run（先构建，后启动）
+    p_br = sub.add_parser("br", help="编译生成 ISO 后立即用 QEMU 启动")
+    p_br.add_argument("--mem", default="128M", help="内存大小（默认 128M）")
+    p_br.add_argument("--serial", action="store_true", help="启用串口输出到终端")
+    p_br.set_defaults(func=br.cmd)
 
     return parser
 
