@@ -10,13 +10,13 @@ from .util import err, info
 
 
 def _kernel_elf() -> str:
-    return os.path.join(config.KERNEL_DIR, "target", config.TARGET, "release", "kernel")
+    return os.path.join(config.KERNEL_DIR, "target", config.TARGET, "debug", "kernel")
 
 
 def _cargo_build_kernel() -> int:
     """编译内核为 ELF"""
     info(f"编译内核 (target={config.TARGET})")
-    cmd = ["cargo", "build", "--release", "--target", config.TARGET]
+    cmd = ["cargo", "build", "--target", config.TARGET]
     r = subprocess.run(cmd, cwd=config.KERNEL_DIR)
     if r.returncode != 0:
         err("内核编译失败")
