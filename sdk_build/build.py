@@ -6,6 +6,7 @@ import shutil
 import subprocess
 
 from . import config
+from .symbols import gen as gen_symbols
 from .util import err, info
 
 
@@ -13,8 +14,17 @@ def _kernel_elf() -> str:
     return os.path.join(config.KERNEL_DIR, "target", config.TARGET, "debug", "kernel")
 
 
+def _symbols_generated() -> str:
+    return os.path.join(config.KERNEL_DIR, "crates", "kernel", "src", "symbols_generated.rs")
+
+
 def _cargo_build_kernel() -> int:
-    """编译内核为 ELF"""
+    """编译内核为 ELF，并在链接后提取符号表二次编译嵌入。
+
+    两阶段原因：符号表数据取自内核二进制，必须先编译出 ELF 才能提取符号。
+    由于符号表 `SYMBOLS` 属于 .rodata 段，不影响 .text 布局，两次编译的
+    函数符号地址一致，故嵌入后符号表依然准确。
+    """
     info(f"编译内核 (target={config.TARGET})")
     cmd = ["cargo", "build", "--target", config.TARGET]
     r = subprocess.run(cmd, cwd=config.KERNEL_DIR)
@@ -25,6 +35,16 @@ def _cargo_build_kernel() -> int:
     if not os.path.isfile(elf):
         err(f"未找到内核 ELF: {elf}")
         return 1
+
+    # 提取符号并重新编译嵌入（供 panic 栈回溯符号化）
+    rc = gen_symbols(elf, _symbols_generated())
+    if rc != 0:
+        return rc
+    info("重新编译以嵌入符号表 ...")
+    r = subprocess.run(cmd, cwd=config.KERNEL_DIR)
+    if r.returncode != 0:
+        err("嵌入符号表后的二次编译失败")
+        return r.returncode
     info(f"内核 ELF: {elf}")
     return 0
 
