@@ -77,6 +77,13 @@ def build_parser() -> argparse.ArgumentParser:
         "该测试验收后停机、不返回主流程（不打印版本横幅），默认关闭",
     )
     p_build.add_argument(
+        "--test-m4.3",
+        dest="test_m43",
+        action="store_true",
+        help="同时启用 M4.3 静态 ELF 加载验收（kernel-test-m43 feature）；"
+        "该测试验收后停机、不返回主流程（不打印版本横幅），默认关闭",
+    )
+    p_build.add_argument(
         "--release",
         action="store_true",
         help="以 release 配置构建内核（验证正式 release 形态）；默认 debug",
@@ -115,6 +122,13 @@ def build_parser() -> argparse.ArgumentParser:
         dest="test_m42",
         action="store_true",
         help="同时启用 M4.2 调度器停机验收（kernel-test-m42 feature）；"
+        "该测试验收后停机、不返回主流程（不打印版本横幅），默认关闭",
+    )
+    p_br.add_argument(
+        "--test-m4.3",
+        dest="test_m43",
+        action="store_true",
+        help="同时启用 M4.3 静态 ELF 加载验收（kernel-test-m43 feature）；"
         "该测试验收后停机、不返回主流程（不打印版本横幅），默认关闭",
     )
     p_br.add_argument(

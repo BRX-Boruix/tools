@@ -23,6 +23,7 @@ def _cargo_build_kernel(
     use_m33: bool = False,
     use_m41: bool = False,
     use_m42: bool = False,
+    use_m43: bool = False,
     release: bool = False,
 ) -> int:
     """编译内核为 ELF，并在链接后提取符号表二次编译嵌入。
@@ -44,6 +45,9 @@ def _cargo_build_kernel(
     `use_m42` 为 True 时额外启用 `kernel-test-m42` feature（M4.2 调度器
     停机验收，隐含 kernel-tests）；该测试验收后停机、不返回主流程，默认关闭。
 
+    `use_m43` 为 True 时额外启用 `kernel-test-m43` feature（M4.3 静态 ELF
+    加载验收，隐含 kernel-tests）；该测试验收后停机、不返回主流程，默认关闭。
+
     `release` 为 True 时以 `--release` 构建（验证正式 release 形态），
     ELF 位于 target/.../release/；否则 debug。
     """
@@ -53,7 +57,7 @@ def _cargo_build_kernel(
     if release:
         cmd.append("--release")
     features = []
-    if use_tests or use_m33 or use_m41 or use_m42:
+    if use_tests or use_m33 or use_m41 or use_m42 or use_m43:
         features.append("kernel-tests")
         info("测试模式：启用 kernel-tests feature（编译带自检测试的内核）")
     if use_m33:
@@ -65,6 +69,9 @@ def _cargo_build_kernel(
     if use_m42:
         features.append("kernel-test-m42")
         info("M4.2：启用 kernel-test-m42 feature（调度器停机验收，跑完即停）")
+    if use_m43:
+        features.append("kernel-test-m43")
+        info("M4.3：启用 kernel-test-m43 feature（静态 ELF 加载验收，跑完即停）")
     if features:
         cmd += ["--features", ",".join(features)]
     r = subprocess.run(cmd, cwd=config.KERNEL_DIR)
@@ -154,6 +161,7 @@ def cmd(args: argparse.Namespace) -> int:
         use_m33=getattr(args, "test_m33", False),
         use_m41=getattr(args, "test_m41", False),
         use_m42=getattr(args, "test_m42", False),
+        use_m43=getattr(args, "test_m43", False),
         release=release,
     )
     if rc != 0:
