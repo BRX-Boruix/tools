@@ -10,15 +10,19 @@ from .symbols import gen as gen_symbols
 from .util import err, info
 
 
-def _kernel_elf() -> str:
-    return os.path.join(config.KERNEL_DIR, "target", config.TARGET, "debug", "kernel")
+def _kernel_elf(profile: str = "debug") -> str:
+    return os.path.join(config.KERNEL_DIR, "target", config.TARGET, profile, "kernel")
 
 
 def _symbols_generated() -> str:
     return os.path.join(config.KERNEL_DIR, "crates", "kernel", "src", "symbols_generated.rs")
 
 
-def _cargo_build_kernel(use_tests: bool = False) -> int:
+def _cargo_build_kernel(
+    use_tests: bool = False,
+    use_m33: bool = False,
+    release: bool = False,
+) -> int:
     """编译内核为 ELF，并在链接后提取符号表二次编译嵌入。
 
     两阶段原因：符号表数据取自内核二进制，必须先编译出 ELF 才能提取符号。
@@ -27,17 +31,33 @@ def _cargo_build_kernel(use_tests: bool = False) -> int:
 
     `use_tests` 为 True 时启用 `kernel-tests` feature（编译带自检测试的
     内核，供开发/验证用）；默认关闭（生产构建不含测试代码）。
+
+    `use_m33` 为 True 时额外启用 `kernel-test-m33` feature（M3.3 用户态
+    异常停机验收，隐含 kernel-tests）；该测试验收后停机、不返回主流程，
+    默认关闭以便 `--test` 跑完常规测试后继续打印版本横幅。
+
+    `release` 为 True 时以 `--release` 构建（验证正式 release 形态），
+    ELF 位于 target/.../release/；否则 debug。
     """
-    info(f"编译内核 (target={config.TARGET})")
+    profile = "release" if release else "debug"
+    info(f"编译内核 (target={config.TARGET}, profile={profile})")
     cmd = ["cargo", "build", "--target", config.TARGET]
-    if use_tests:
-        cmd += ["--features", "kernel-tests"]
+    if release:
+        cmd.append("--release")
+    features = []
+    if use_tests or use_m33:
+        features.append("kernel-tests")
         info("测试模式：启用 kernel-tests feature（编译带自检测试的内核）")
+    if use_m33:
+        features.append("kernel-test-m33")
+        info("M3.3：启用 kernel-test-m33 feature（用户态异常停机验收，跑完即停）")
+    if features:
+        cmd += ["--features", ",".join(features)]
     r = subprocess.run(cmd, cwd=config.KERNEL_DIR)
     if r.returncode != 0:
         err("内核编译失败")
         return r.returncode
-    elf = _kernel_elf()
+    elf = _kernel_elf(profile)
     if not os.path.isfile(elf):
         err(f"未找到内核 ELF: {elf}")
         return 1
@@ -55,7 +75,7 @@ def _cargo_build_kernel(use_tests: bool = False) -> int:
     return 0
 
 
-def _make_iso() -> int:
+def _make_iso(profile: str = "debug") -> int:
     """用 xorriso 生成 BIOS+UEFI 混合引导 ISO"""
     iso_root = os.path.join(config.SDK_DIR, "iso_root")
     if os.path.isdir(iso_root):
@@ -64,7 +84,7 @@ def _make_iso() -> int:
     os.makedirs(os.path.join(iso_root, "EFI", "BOOT"), exist_ok=True)
 
     # 拷贝内核
-    shutil.copy(_kernel_elf(), os.path.join(iso_root, "boot", "kernel"))
+    shutil.copy(_kernel_elf(profile), os.path.join(iso_root, "boot", "kernel"))
     # 拷贝 limine.conf
     shutil.copy(config.LIMINE_CONF, os.path.join(iso_root, "boot", "limine", "limine.conf"))
 
@@ -113,7 +133,13 @@ def _make_iso() -> int:
 
 def cmd(args: argparse.Namespace) -> int:
     """编译内核并生成可引导 ISO"""
-    rc = _cargo_build_kernel(use_tests=getattr(args, "test", False))
+    release = getattr(args, "release", False)
+    profile = "release" if release else "debug"
+    rc = _cargo_build_kernel(
+        use_tests=getattr(args, "test", False),
+        use_m33=getattr(args, "test_m33", False),
+        release=release,
+    )
     if rc != 0:
         return rc
-    return _make_iso()
+    return _make_iso(profile)

@@ -55,6 +55,18 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="编译带自检测试的内核（启用 kernel-tests feature）；默认不含测试",
     )
+    p_build.add_argument(
+        "--test-m3.3",
+        dest="test_m33",
+        action="store_true",
+        help="同时启用 M3.3 用户态异常停机验收（kernel-test-m33 feature）；"
+        "该测试验收后停机、不返回主流程（不打印版本横幅），默认关闭",
+    )
+    p_build.add_argument(
+        "--release",
+        action="store_true",
+        help="以 release 配置构建内核（验证正式 release 形态）；默认 debug",
+    )
     p_build.set_defaults(func=build.cmd)
 
     # run 子命令
@@ -69,6 +81,18 @@ def build_parser() -> argparse.ArgumentParser:
         "--test",
         action="store_true",
         help="编译带自检测试的内核（启用 kernel-tests feature）；默认不含测试",
+    )
+    p_br.add_argument(
+        "--test-m3.3",
+        dest="test_m33",
+        action="store_true",
+        help="同时启用 M3.3 用户态异常停机验收（kernel-test-m33 feature）；"
+        "该测试验收后停机、不返回主流程（不打印版本横幅），默认关闭",
+    )
+    p_br.add_argument(
+        "--release",
+        action="store_true",
+        help="以 release 配置构建内核（验证正式 release 形态）；默认 debug",
     )
     p_br.add_argument("--mem", default="128M", help="内存大小（默认 128M）")
     p_br.add_argument("--serial", action="store_true", help="启用串口输出到终端")
