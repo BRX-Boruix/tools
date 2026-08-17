@@ -167,31 +167,34 @@ def _make_iso(profile: str = "debug") -> int:
 
 
 def _build_userspace() -> int:
-    """编译用户程序（libsys + init），生成 init ELF 供内核 `include_bytes!` 嵌入。
+    """编译用户程序（libsys + init + shell），生成 ELF 供内核 `include_bytes!` 嵌入。
 
-    用户程序（init）是 Rust no_std 程序，依赖 libsys 薄封装调 syscall。
-    编译产物复制到内核源码目录 `crates/kernel/init.elf`，内核 M4.4 测试
-    用 `include_bytes!("../init.elf")` 在编译期嵌入。
+    用户程序是 Rust no_std 独立 bin crate，依赖 libsys 薄封装调 syscall。
+    每个编译产物复制到内核源码目录 `crates/kernel/<name>.elf`，内核生产路径
+    （`main.rs::PROGRAMS`）经 `include_bytes!` 编译期嵌入。
     """
-    init_dir = os.path.join(config.PROJECT_ROOT, "init")
-    info("编译用户程序 (init + libsys)")
-    cmd = [
-        "cargo", "build",
-        "--manifest-path", os.path.join(init_dir, "Cargo.toml"),
-        "--target", config.TARGET,
-        "--release",
-    ]
-    r = subprocess.run(cmd, cwd=config.PROJECT_ROOT)
-    if r.returncode != 0:
-        err("用户程序编译失败")
-        return r.returncode
-    elf = os.path.join(init_dir, "target", config.TARGET, "release", "init")
-    if not os.path.isfile(elf):
-        err(f"未找到 init ELF: {elf}")
-        return 1
-    dst = os.path.join(config.KERNEL_DIR, "crates", "kernel", "init.elf")
-    shutil.copy(elf, dst)
-    info(f"init ELF 已复制到内核源码目录: {dst}")
+    # (源目录, 产物 bin 名)
+    programs = [("init", "init"), ("shell", "shell")]
+    for src, bin_name in programs:
+        dir_ = os.path.join(config.PROJECT_ROOT, src)
+        info(f"编译用户程序 ({src} + libsys)")
+        cmd = [
+            "cargo", "build",
+            "--manifest-path", os.path.join(dir_, "Cargo.toml"),
+            "--target", config.TARGET,
+            "--release",
+        ]
+        r = subprocess.run(cmd, cwd=config.PROJECT_ROOT)
+        if r.returncode != 0:
+            err(f"用户程序 {src} 编译失败")
+            return r.returncode
+        elf = os.path.join(dir_, "target", config.TARGET, "release", bin_name)
+        if not os.path.isfile(elf):
+            err(f"未找到 {src} ELF: {elf}")
+            return 1
+        dst = os.path.join(config.KERNEL_DIR, "crates", "kernel", f"{bin_name}.elf")
+        shutil.copy(elf, dst)
+        info(f"{src} ELF 已复制到内核源码目录: {dst}")
     return 0
 
 
