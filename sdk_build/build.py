@@ -24,6 +24,7 @@ def _cargo_build_kernel(
     use_m41: bool = False,
     use_m42: bool = False,
     use_m43: bool = False,
+    use_m44: bool = False,
     release: bool = False,
 ) -> int:
     """编译内核为 ELF，并在链接后提取符号表二次编译嵌入。
@@ -48,6 +49,9 @@ def _cargo_build_kernel(
     `use_m43` 为 True 时额外启用 `kernel-test-m43` feature（M4.3 静态 ELF
     加载验收，隐含 kernel-tests）；该测试验收后停机、不返回主流程，默认关闭。
 
+    `use_m44` 为 True 时额外启用 `kernel-test-m44` feature（M4.4 真实用户
+    程序验收，隐含 kernel-tests）；该测试验收后停机、不返回主流程，默认关闭。
+
     `release` 为 True 时以 `--release` 构建（验证正式 release 形态），
     ELF 位于 target/.../release/；否则 debug。
     """
@@ -57,7 +61,7 @@ def _cargo_build_kernel(
     if release:
         cmd.append("--release")
     features = []
-    if use_tests or use_m33 or use_m41 or use_m42 or use_m43:
+    if use_tests or use_m33 or use_m41 or use_m42 or use_m43 or use_m44:
         features.append("kernel-tests")
         info("测试模式：启用 kernel-tests feature（编译带自检测试的内核）")
     if use_m33:
@@ -72,6 +76,9 @@ def _cargo_build_kernel(
     if use_m43:
         features.append("kernel-test-m43")
         info("M4.3：启用 kernel-test-m43 feature（静态 ELF 加载验收，跑完即停）")
+    if use_m44:
+        features.append("kernel-test-m44")
+        info("M4.4：启用 kernel-test-m44 feature（真实用户程序验收，跑完即停）")
     if features:
         cmd += ["--features", ",".join(features)]
     r = subprocess.run(cmd, cwd=config.KERNEL_DIR)
@@ -152,16 +159,51 @@ def _make_iso(profile: str = "debug") -> int:
     return 0
 
 
+def _build_userspace() -> int:
+    """编译用户程序（libsys + init），生成 init ELF 供内核 `include_bytes!` 嵌入。
+
+    用户程序（init）是 Rust no_std 程序，依赖 libsys 薄封装调 syscall。
+    编译产物复制到内核源码目录 `crates/kernel/init.elf`，内核 M4.4 测试
+    用 `include_bytes!("../init.elf")` 在编译期嵌入。
+    """
+    init_dir = os.path.join(config.PROJECT_ROOT, "init")
+    info("编译用户程序 (init + libsys)")
+    cmd = [
+        "cargo", "build",
+        "--manifest-path", os.path.join(init_dir, "Cargo.toml"),
+        "--target", config.TARGET,
+        "--release",
+    ]
+    r = subprocess.run(cmd, cwd=config.PROJECT_ROOT)
+    if r.returncode != 0:
+        err("用户程序编译失败")
+        return r.returncode
+    elf = os.path.join(init_dir, "target", config.TARGET, "release", "init")
+    if not os.path.isfile(elf):
+        err(f"未找到 init ELF: {elf}")
+        return 1
+    dst = os.path.join(config.KERNEL_DIR, "crates", "kernel", "init.elf")
+    shutil.copy(elf, dst)
+    info(f"init ELF 已复制到内核源码目录: {dst}")
+    return 0
+
+
 def cmd(args: argparse.Namespace) -> int:
     """编译内核并生成可引导 ISO"""
     release = getattr(args, "release", False)
     profile = "release" if release else "debug"
+    # M4.4：先编译用户程序（init），供内核 include_bytes! 嵌入（编译期需要）。
+    if getattr(args, "test_m44", False):
+        rc = _build_userspace()
+        if rc != 0:
+            return rc
     rc = _cargo_build_kernel(
         use_tests=getattr(args, "test", False),
         use_m33=getattr(args, "test_m33", False),
         use_m41=getattr(args, "test_m41", False),
         use_m42=getattr(args, "test_m42", False),
         use_m43=getattr(args, "test_m43", False),
+        use_m44=getattr(args, "test_m44", False),
         release=release,
     )
     if rc != 0:
