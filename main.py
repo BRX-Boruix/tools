@@ -91,6 +91,13 @@ def build_parser() -> argparse.ArgumentParser:
         "先编译 libsys+init 用户程序再编译内核嵌入，验收后停机，默认关闭",
     )
     p_build.add_argument(
+        "--test-m5",
+        dest="test_m5",
+        action="store_true",
+        help="同时启用 M5 写时复制 COW 验收（kernel-test-m5 feature）；"
+        "纯内存逻辑，返回主流程继续启动，默认关闭",
+    )
+    p_build.add_argument(
         "--release",
         action="store_true",
         help="以 release 配置构建内核（验证正式 release 形态）；默认 debug",
@@ -144,6 +151,13 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="同时启用 M4.4 真实用户程序验收（kernel-test-m44 feature）；"
         "先编译 libsys+init 用户程序再编译内核嵌入，验收后停机，默认关闭",
+    )
+    p_br.add_argument(
+        "--test-m5",
+        dest="test_m5",
+        action="store_true",
+        help="同时启用 M5 写时复制 COW 验收（kernel-test-m5 feature）；"
+        "纯内存逻辑，返回主流程继续启动，默认关闭",
     )
     p_br.add_argument(
         "--release",
