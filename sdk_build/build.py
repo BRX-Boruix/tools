@@ -21,6 +21,7 @@ def _symbols_generated() -> str:
 def _cargo_build_kernel(
     use_tests: bool = False,
     use_m33: bool = False,
+    use_m41: bool = False,
     release: bool = False,
 ) -> int:
     """编译内核为 ELF，并在链接后提取符号表二次编译嵌入。
@@ -36,6 +37,9 @@ def _cargo_build_kernel(
     异常停机验收，隐含 kernel-tests）；该测试验收后停机、不返回主流程，
     默认关闭以便 `--test` 跑完常规测试后继续打印版本横幅。
 
+    `use_m41` 为 True 时额外启用 `kernel-test-m41` feature（M4.1 syscall
+    停机验收，隐含 kernel-tests）；该测试验收后停机、不返回主流程，默认关闭。
+
     `release` 为 True 时以 `--release` 构建（验证正式 release 形态），
     ELF 位于 target/.../release/；否则 debug。
     """
@@ -45,12 +49,15 @@ def _cargo_build_kernel(
     if release:
         cmd.append("--release")
     features = []
-    if use_tests or use_m33:
+    if use_tests or use_m33 or use_m41:
         features.append("kernel-tests")
         info("测试模式：启用 kernel-tests feature（编译带自检测试的内核）")
     if use_m33:
         features.append("kernel-test-m33")
         info("M3.3：启用 kernel-test-m33 feature（用户态异常停机验收，跑完即停）")
+    if use_m41:
+        features.append("kernel-test-m41")
+        info("M4.1：启用 kernel-test-m41 feature（syscall 停机验收，跑完即停）")
     if features:
         cmd += ["--features", ",".join(features)]
     r = subprocess.run(cmd, cwd=config.KERNEL_DIR)
@@ -138,6 +145,7 @@ def cmd(args: argparse.Namespace) -> int:
     rc = _cargo_build_kernel(
         use_tests=getattr(args, "test", False),
         use_m33=getattr(args, "test_m33", False),
+        use_m41=getattr(args, "test_m41", False),
         release=release,
     )
     if rc != 0:
