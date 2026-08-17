@@ -199,11 +199,12 @@ def cmd(args: argparse.Namespace) -> int:
     """编译内核并生成可引导 ISO"""
     release = getattr(args, "release", False)
     profile = "release" if release else "debug"
-    # M4.4：先编译用户程序（init），供内核 include_bytes! 嵌入（编译期需要）。
-    if getattr(args, "test_m44", False):
-        rc = _build_userspace()
-        if rc != 0:
-            return rc
+    # 生产化（boot→init）：无条件先编译用户程序（libsys + init），供内核
+    # include_bytes! 嵌入（编译期需要）。内核生产路径 `start_init` 始终加载
+    # init.elf，故无论是否测试模式都必须生成，否则编译失败。
+    rc = _build_userspace()
+    if rc != 0:
+        return rc
     rc = _cargo_build_kernel(
         use_tests=getattr(args, "test", False),
         use_m33=getattr(args, "test_m33", False),
