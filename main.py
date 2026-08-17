@@ -50,6 +50,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     # build 子命令
     p_build = sub.add_parser("build", help="编译内核并生成可引导 ISO")
+    p_build.add_argument(
+        "--test",
+        action="store_true",
+        help="编译带自检测试的内核（启用 kernel-tests feature）；默认不含测试",
+    )
     p_build.set_defaults(func=build.cmd)
 
     # run 子命令
@@ -60,6 +65,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     # br 子命令：Build and Run（先构建，后启动）
     p_br = sub.add_parser("br", help="编译生成 ISO 后立即用 QEMU 启动")
+    p_br.add_argument(
+        "--test",
+        action="store_true",
+        help="编译带自检测试的内核（启用 kernel-tests feature）；默认不含测试",
+    )
     p_br.add_argument("--mem", default="128M", help="内存大小（默认 128M）")
     p_br.add_argument("--serial", action="store_true", help="启用串口输出到终端")
     p_br.set_defaults(func=br.cmd)

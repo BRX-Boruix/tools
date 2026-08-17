@@ -18,15 +18,21 @@ def _symbols_generated() -> str:
     return os.path.join(config.KERNEL_DIR, "crates", "kernel", "src", "symbols_generated.rs")
 
 
-def _cargo_build_kernel() -> int:
+def _cargo_build_kernel(use_tests: bool = False) -> int:
     """编译内核为 ELF，并在链接后提取符号表二次编译嵌入。
 
     两阶段原因：符号表数据取自内核二进制，必须先编译出 ELF 才能提取符号。
     由于符号表 `SYMBOLS` 属于 .rodata 段，不影响 .text 布局，两次编译的
     函数符号地址一致，故嵌入后符号表依然准确。
+
+    `use_tests` 为 True 时启用 `kernel-tests` feature（编译带自检测试的
+    内核，供开发/验证用）；默认关闭（生产构建不含测试代码）。
     """
     info(f"编译内核 (target={config.TARGET})")
     cmd = ["cargo", "build", "--target", config.TARGET]
+    if use_tests:
+        cmd += ["--features", "kernel-tests"]
+        info("测试模式：启用 kernel-tests feature（编译带自检测试的内核）")
     r = subprocess.run(cmd, cwd=config.KERNEL_DIR)
     if r.returncode != 0:
         err("内核编译失败")
@@ -107,7 +113,7 @@ def _make_iso() -> int:
 
 def cmd(args: argparse.Namespace) -> int:
     """编译内核并生成可引导 ISO"""
-    rc = _cargo_build_kernel()
+    rc = _cargo_build_kernel(use_tests=getattr(args, "test", False))
     if rc != 0:
         return rc
     return _make_iso()
