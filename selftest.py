@@ -108,7 +108,7 @@ def analyze_log() -> dict:
 
     # 显式 PASS 标志
     res["passed_blocks"] = sorted(
-        set(re.findall(r"\[test-[a-z-]+\][^\n]*PASS", text))
+        set(re.findall(r"\[test-[\w-]+\][^\n]*PASS", text))
     )
     return res
 
