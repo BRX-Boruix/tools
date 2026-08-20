@@ -56,6 +56,8 @@ def run_qemu(qemu: str, mem: str, timeout: int) -> tuple:
         "-m", mem,
         "-display", "none",
         "-serial", f"file:{log_arg}",
+        "-netdev", "user,id=net0",
+        "-device", "e1000,netdev=net0",
         "-no-reboot",
     ]
     info(f"启动 QEMU: {' '.join(cmd)}")
