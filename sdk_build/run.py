@@ -35,7 +35,18 @@ def cmd(args: argparse.Namespace) -> int:
         err(f"未找到 {config.QEMU}，请在 .env 配置 QEMU_DIR 或加入 PATH")
         return 1
 
-    cmd = [qemu, "-cdrom", config.OUTPUT_ISO, "-m", str(args.mem)]
+    disk_path = config.PROJECT_ROOT + os.sep + "disk.img"
+    from . import disk
+    disk.ensure_disk_image_exists(disk_path)
+
+    cmd = [
+        qemu,
+        "-cdrom", config.OUTPUT_ISO,
+        "-hda", disk_path,
+        "-m", str(args.mem),
+        "-netdev", "user,id=net0",
+        "-device", "e1000,netdev=net0",
+    ]
     if args.serial:
         cmd += ["-serial", "stdio"]
     info(f"启动 QEMU: {os.path.basename(qemu)}")

@@ -46,6 +46,10 @@ def find_qemu() -> str:
 
 def run_qemu(qemu: str, mem: str, timeout: int) -> tuple:
     """启动 QEMU 无头运行，串口写入 LOG_PATH；超时 kill。返回 (rc, elapsed)。"""
+    from sdk_build import disk
+    disk_path = config.PROJECT_ROOT + os.sep + "disk.img"
+    disk.ensure_disk_image_exists(disk_path)
+
     cmd = [
         qemu,
         "-cdrom", config.OUTPUT_ISO,
@@ -57,7 +61,6 @@ def run_qemu(qemu: str, mem: str, timeout: int) -> tuple:
         "-no-reboot",
     ]
     info(f"启动 QEMU: {' '.join(cmd)}")
-    info(f"超时 {timeout}s，串口输出 -> {LOG_PATH}")
     start = time.monotonic()
     try:
         with open(LOG_PATH, "w", encoding="utf-8", errors="replace") as out_f:

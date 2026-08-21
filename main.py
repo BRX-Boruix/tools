@@ -18,7 +18,7 @@ BORUIX SDK 辅助工具统一入口。
 import argparse
 import sys
 
-from sdk_build import br, build, limine, run
+from sdk_build import br, build, disk, limine, run
 from sdk_build.config import DEFAULT_LIMINE_VERSION
 
 
@@ -167,6 +167,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_br.add_argument("--mem", default="128M", help="内存大小（默认 128M）")
     p_br.add_argument("--serial", action="store_true", help="启用串口输出到终端")
     p_br.set_defaults(func=br.cmd)
+
+    # mkimg 子命令：创建/格式化物理磁盘镜像
+    p_mkimg = sub.add_parser("mkimg", help="创建或重新格式化物理磁盘镜像 (EXT2)")
+    p_mkimg.add_argument("--size", type=int, default=64, help="磁盘大小 (MB，默认 64)")
+    p_mkimg.add_argument("--label", default="BORUIX_DATA", help="EXT2 卷标名 (默认 BORUIX_DATA)")
+    p_mkimg.add_argument("--force", "-f", action="store_true", help="强制覆盖已有磁盘镜像无需确认")
+    p_mkimg.set_defaults(func=disk.cmd_mkimg)
 
     return parser
 
