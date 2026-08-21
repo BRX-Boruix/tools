@@ -46,16 +46,12 @@ def find_qemu() -> str:
 
 def run_qemu(qemu: str, mem: str, timeout: int) -> tuple:
     """启动 QEMU 无头运行，串口写入 LOG_PATH；超时 kill。返回 (rc, elapsed)。"""
-    if os.path.isfile(LOG_PATH):
-        os.remove(LOG_PATH)
-    # -serial file: 在 Windows 下对路径分隔符敏感，统一用正斜杠
-    log_arg = os.path.normpath(LOG_PATH).replace("\\", "/")
     cmd = [
         qemu,
         "-cdrom", config.OUTPUT_ISO,
         "-m", mem,
         "-display", "none",
-        "-serial", f"file:{log_arg}",
+        "-serial", "stdio",
         "-netdev", "user,id=net0",
         "-device", "e1000,netdev=net0",
         "-no-reboot",
@@ -64,7 +60,8 @@ def run_qemu(qemu: str, mem: str, timeout: int) -> tuple:
     info(f"超时 {timeout}s，串口输出 -> {LOG_PATH}")
     start = time.monotonic()
     try:
-        subprocess.run(cmd, timeout=timeout)
+        with open(LOG_PATH, "w", encoding="utf-8", errors="replace") as out_f:
+            subprocess.run(cmd, stdout=out_f, stderr=subprocess.STDOUT, timeout=timeout)
         rc = 0
     except subprocess.TimeoutExpired:
         info(f"QEMU 运行超时（>{timeout}s），自动终止")
