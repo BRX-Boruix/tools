@@ -53,6 +53,8 @@ def run_qemu(qemu: str, mem: str, timeout: int) -> tuple:
     cmd = [
         qemu,
         "-cdrom", config.OUTPUT_ISO,
+        "-hda", disk_path,
+        "-boot", "order=d",
         "-m", mem,
         "-display", "none",
         "-serial", "stdio",

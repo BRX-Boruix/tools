@@ -43,6 +43,7 @@ def cmd(args: argparse.Namespace) -> int:
         qemu,
         "-cdrom", config.OUTPUT_ISO,
         "-hda", disk_path,
+        "-boot", "order=d",
         "-m", str(args.mem),
         "-netdev", "user,id=net0",
         "-device", "e1000,netdev=net0",
