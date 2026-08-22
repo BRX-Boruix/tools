@@ -180,6 +180,70 @@ def create_ext2_disk_image(path: str, size_mb: int = 64, label: str = "BORUIX_DA
         f.seek(part_byte_offset + 26 * block_size)
         f.write(notes_content.ljust(block_size, b"\x00"))
 
+        # --- M13/#13：嵌入真实用户程序（内核唯一来源，include_bytes! 已退役）---
+        elf_dir = os.path.join(config.KERNEL_DIR, "crates", "kernel")
+        next_block = 30
+        bin_entries = []
+        for idx, nm in enumerate(("init.elf", "shell.elf")):
+            p = os.path.join(elf_dir, nm)
+            if not os.path.isfile(p):
+                raise SystemExit(
+                    f"[disk] 缺少必需的用户程序 {p}——请先完成内核/用户态构建；"
+                    "镜像生成拒绝在没有真实程序的情况下伪造占位文件"
+                )
+            with open(p, "rb") as bf:
+                content = bf.read()
+            n_blocks = (len(content) + block_size - 1) // block_size
+            direct = min(12, n_blocks)
+            data_blocks = list(range(next_block, next_block + n_blocks))
+            next_block += n_blocks
+            indirect_blk = 0
+            if n_blocks > 12:
+                indirect_blk = next_block
+                next_block += 1
+                tbl = bytearray(block_size)
+                for i, b in enumerate(data_blocks[12:]):
+                    struct.pack_into("<I", tbl, i * 4, b)
+                f.seek(part_byte_offset + indirect_blk * block_size)
+                f.write(tbl)
+            for i, b in enumerate(data_blocks):
+                f.seek(part_byte_offset + b * block_size)
+                f.write(content[i * block_size:(i + 1) * block_size].ljust(block_size, b"\x00"))
+            ino = 13 + idx
+            itab_off = part_byte_offset + 5 * block_size
+            raw = bytearray(128)
+            struct.pack_into("<H", raw, 0, EXT2_S_IFREG | 0o755)
+            struct.pack_into("<I", raw, 4, len(content))
+            struct.pack_into("<H", raw, 26, 1)
+            struct.pack_into("<I", raw, 28, (len(content) + 511) // 512)
+            for i in range(direct):
+                struct.pack_into("<I", raw, 40 + i * 4, data_blocks[i])
+            if indirect_blk:
+                struct.pack_into("<I", raw, 40 + 12 * 4, indirect_blk)
+            f.seek(itab_off + (ino - 1) * 128)
+            f.write(raw)
+            bin_entries.append((ino, nm, len(content)))
+            info(f"镜像嵌入 {nm}: {len(content)} 字节, inode={ino}, 数据块 {data_blocks[0]}..{data_blocks[-1]}"
+                 + (f", 间接块 {indirect_blk}" if indirect_blk else ""))
+
+        # inode 位图更新：inode 1..14 现已占用（位 0..13）
+        f.seek(part_byte_offset + 4 * block_size)
+        f.write(b"\xFF\x7F" + b"\x00" * (block_size - 2))
+
+        # 根目录块重写：加入 init.elf / shell.elf 目录项（最后一项填满块尾）
+        f.seek(part_byte_offset + 20 * block_size)
+        dir_data2 = bytearray(1024)
+        cur = 0
+        cur = append_dir_entry(dir_data2, cur, 2, ".", EXT2_FT_DIR, 12)
+        cur = append_dir_entry(dir_data2, cur, 2, "..", EXT2_FT_DIR, 12)
+        cur = append_dir_entry(dir_data2, cur, 11, "hello.txt", EXT2_FT_REG_FILE, 20)
+        cur = append_dir_entry(dir_data2, cur, 12, "notes.txt", EXT2_FT_REG_FILE, 20)
+        cur = append_dir_entry(dir_data2, cur, bin_entries[0][0], bin_entries[0][1],
+                               EXT2_FT_REG_FILE, 16)
+        append_dir_entry(dir_data2, cur, bin_entries[1][0], bin_entries[1][1],
+                         EXT2_FT_REG_FILE, 1024 - cur)
+        f.write(dir_data2)
+
     info(f"磁盘镜像创建成功: {path} (MBR Partition 1 -> EXT2 FS OK)")
     return True
 
