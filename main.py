@@ -98,6 +98,13 @@ def build_parser() -> argparse.ArgumentParser:
         "纯内存逻辑，返回主流程继续启动，默认关闭",
     )
     p_build.add_argument(
+        "--test-waitpid",
+        dest="test_waitpid",
+        action="store_true",
+        help="同时启用 C7.1/#7 waitpid 父子链停机验收（kernel-test-waitpid feature）；"
+        "该测试验收后停机、不返回主流程，默认关闭",
+    )
+    p_build.add_argument(
         "--release",
         action="store_true",
         help="以 release 配置构建内核（验证正式 release 形态）；默认 debug",
@@ -158,6 +165,13 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="同时启用 M5 写时复制 COW 验收（kernel-test-m5 feature）；"
         "纯内存逻辑，返回主流程继续启动，默认关闭",
+    )
+    p_br.add_argument(
+        "--test-waitpid",
+        dest="test_waitpid",
+        action="store_true",
+        help="同时启用 C7.1/#7 waitpid 父子链停机验收（kernel-test-waitpid feature）；"
+        "该测试验收后停机、不返回主流程，默认关闭",
     )
     p_br.add_argument(
         "--release",
