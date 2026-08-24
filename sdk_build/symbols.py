@@ -75,7 +75,7 @@ def parse_nm(lines):
     return syms
 
 
-def gen(elf: str, out: str) -> int:
+def gen(elf: str, out: str, epoch: int = 0) -> int:
     if not os.path.isfile(elf):
         sys.exit(f"[sdk] 错误: 内核 ELF 不存在: {elf}")
 
@@ -90,6 +90,9 @@ def gen(elf: str, out: str) -> int:
         "// 本文件由 sdk/sdk_build/symbols.py 自动生成，请勿手动编辑。",
         "// 内容为按地址升序排列的符号表：(起始地址, 函数名)。",
         f"// 提取自: {os.path.basename(elf)}，共 {len(syms)} 个函数符号。",
+        "// KM13：符号纪元——与本二进制编译时的 BORUIX_SYMBOLS_BUILD_EPOCH 比对，",
+        "// 不一致即快照陈旧（直连 cargo build 使用了 checked-in 快照）。",
+        f"pub const SYMBOLS_EPOCH: u64 = {epoch};",
         "pub static SYMBOLS: &[(u64, &str)] = &[",
     ]
     for addr, name in syms:

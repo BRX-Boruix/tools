@@ -66,6 +66,14 @@ def _cargo_build_kernel(
     """
     profile = "release" if release else "debug"
     info(f"编译内核 (target={config.TARGET}, profile={profile})")
+
+    # KM13：符号纪元——本次 SDK 构建的唯一标识，贯穿两遍编译与符号生成。
+    # 内核运行时比对"嵌入符号表的纪元"与"本二进制编译纪元"，不一致即
+    # 直连 cargo build 用了 checked-in 陈旧快照，启动横幅如实告警。
+    import time
+    symbols_epoch = int(time.time() * 1000)
+    env = dict(os.environ, BORUIX_SYMBOLS_EPOCH=str(symbols_epoch))
+
     cmd = ["cargo", "build", "--target", config.TARGET]
     if release:
         cmd.append("--release")
@@ -96,7 +104,7 @@ def _cargo_build_kernel(
         info("C7.1/#7：启用 kernel-test-waitpid feature（waitpid 父子链停机验收，跑完即停）")
     if features:
         cmd += ["--features", ",".join(features)]
-    r = subprocess.run(cmd, cwd=config.KERNEL_DIR)
+    r = subprocess.run(cmd, cwd=config.KERNEL_DIR, env=env)
     if r.returncode != 0:
         err("内核编译失败")
         return r.returncode
@@ -106,11 +114,11 @@ def _cargo_build_kernel(
         return 1
 
     # 提取符号并重新编译嵌入（供 panic 栈回溯符号化）
-    rc = gen_symbols(elf, _symbols_generated())
+    rc = gen_symbols(elf, _symbols_generated(), epoch=symbols_epoch)
     if rc != 0:
         return rc
     info("重新编译以嵌入符号表 ...")
-    r = subprocess.run(cmd, cwd=config.KERNEL_DIR)
+    r = subprocess.run(cmd, cwd=config.KERNEL_DIR, env=env)
     if r.returncode != 0:
         err("嵌入符号表后的二次编译失败")
         return r.returncode

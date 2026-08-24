@@ -48,6 +48,13 @@ def run_qemu(qemu: str, mem: str, timeout: int) -> tuple:
     """启动 QEMU 无头运行，串口写入 LOG_PATH；超时 kill。返回 (rc, elapsed)。"""
     from sdk_build import disk
     disk_path = config.PROJECT_ROOT + os.sep + "disk.img"
+    # KA2（自检写盘隔离）：kernel-tests 的 m72 / ata-tail-probe 会向磁盘数据区
+    # 写 scratch 标记，disk.img 跨运行持久沿用会让腐蚀在 EXT2 数据区累积——
+    # 轻则 /binaries 内容被标记覆盖，重则后续 boot 加载损坏 ELF 触发与被测
+    # 代码无关的静默复位，污染验收结论。自检每次强制重建空白镜像：scratch
+    # 只落在一次性状态上，跨启动不可见。
+    if os.path.isfile(disk_path):
+        os.remove(disk_path)
     disk.ensure_disk_image_exists(disk_path)
 
     cmd = [
@@ -102,6 +109,11 @@ def analyze_log() -> dict:
 
     # PANIC / 异常捕获
     res["panics"] = re.findall(r"KERNEL PANIC[^\n]*|PANIC[^\n]*|panicked at[^\n]*", text)
+
+    # 内核态异常停机（interrupts.rs halt_forever 前的横幅）。此前未检测：
+    # 异常停机与"内核持续运行（测试后不退出）"在退出码上不可区分（均为
+    # 超时 kill），曾导致停机被误判为通过。
+    res["cpu_exceptions"] = re.findall(r"CPU EXCEPTION[^\n]*", text)
 
     # assert 失败（Rust 惯用格式）
     res["assert_fails"] = re.findall(r"assertion[^\n]*failed[^\n]*", text)
@@ -167,11 +179,15 @@ def main() -> int:
         print(f"  [失败] assert 失败 {len(res['assert_fails'])} 处:")
         for a in res["assert_fails"][:10]:
             print(f"    {a}")
+    if res["cpu_exceptions"]:
+        print(f"  [失败] CPU EXCEPTION（内核态异常停机）{len(res['cpu_exceptions'])} 处:")
+        for e in res["cpu_exceptions"][:10]:
+            print(f"    {e}")
 
     # 判定
-    failed = bool(res["panics"] or res["assert_fails"])
+    failed = bool(res["panics"] or res["assert_fails"] or res["cpu_exceptions"])
     if failed:
-        err("判定：测试失败（存在 PANIC 或 assert 失败）")
+        err("判定：测试失败（存在 PANIC / assert 失败 / CPU EXCEPTION）")
         return 1
     if not res["test_blocks"]:
         err("判定：日志中未捕获任何 [test-*] 输出（构建可能未启用 kernel-tests）")
