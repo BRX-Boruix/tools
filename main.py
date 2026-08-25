@@ -115,10 +115,23 @@ def build_parser() -> argparse.ArgumentParser:
     p_run = sub.add_parser("run", help="用 QEMU 启动 ISO")
     p_run.add_argument("--mem", default="128M", help="内存大小（默认 128M）")
     p_run.add_argument("--serial", action="store_true", help="启用串口输出到终端")
-    p_run.add_argument(
+    # 盘策略三选一：默认即 LiveCD（不挂盘）；--disk 挂现有盘（缺失自动建）；
+    # --redisk 重建盘再挂。均为互斥，绝不静默覆盖盘数据。
+    p_run_disk_grp = p_run.add_mutually_exclusive_group()
+    p_run_disk_grp.add_argument(
+        "--disk",
+        action="store_true",
+        help="挂载外部盘（disk.img，缺失自动创建）——非 LiveCD",
+    )
+    p_run_disk_grp.add_argument(
+        "--redisk",
+        action="store_true",
+        help="无条件重建外部盘再挂载（清旧盘数据，用当前构建产物）",
+    )
+    p_run_disk_grp.add_argument(
         "--nodisk",
         action="store_true",
-        help="不挂载外部盘（不加 -hda），以纯 liveCD 形态启动（ADR-017）",
+        help="显式声明纯 LiveCD 启动（默认即此，仅供消除歧义）",
     )
     p_run.set_defaults(func=run.cmd)
 
@@ -185,10 +198,22 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_br.add_argument("--mem", default="128M", help="内存大小（默认 128M）")
     p_br.add_argument("--serial", action="store_true", help="启用串口输出到终端")
-    p_br.add_argument(
+    # 盘策略三选一（同 run）：默认即 LiveCD；--disk 挂盘；--redisk 重建盘再挂。
+    p_br_disk_grp = p_br.add_mutually_exclusive_group()
+    p_br_disk_grp.add_argument(
+        "--disk",
+        action="store_true",
+        help="挂载外部盘（disk.img，缺失自动创建）——非 LiveCD",
+    )
+    p_br_disk_grp.add_argument(
+        "--redisk",
+        action="store_true",
+        help="无条件重建外部盘再挂载（清旧盘数据，用当前构建产物）",
+    )
+    p_br_disk_grp.add_argument(
         "--nodisk",
         action="store_true",
-        help="不挂载外部盘（不加 -hda），以纯 liveCD 形态启动（ADR-017）",
+        help="显式声明纯 LiveCD 启动（默认即此，仅供消除歧义）",
     )
     p_br.set_defaults(func=br.cmd)
 

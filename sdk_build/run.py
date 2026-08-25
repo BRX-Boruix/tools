@@ -37,17 +37,25 @@ def cmd(args: argparse.Namespace) -> int:
 
     disk_path = config.PROJECT_ROOT + os.sep + "disk.img"
     from . import disk
-    # --nodisk（ADR-017 liveCD）：不保证、不挂载外部盘；否则缺失时自动创建
-    # （盘 = 持久外部存储模拟，缺失即重建——见 disk.ensure_disk_image_exists）。
+    # 盘策略三选一（main.py 用 mutually exclusive group 保证至多其一）：
+    #   默认 / `--nodisk`  → LiveCD：不挂盘，盘从未创建也不影响（ADR-017）
+    #   `--disk`           → 挂现有盘（缺失则自动创建）
+    #   `--redisk`         → 无条件重建盘再挂（清旧盘数据，用当前构建产物）
+    # 盘是"持久外部存储"模拟（ADR-013/016）：重建会清除盘上数据，故仅通过
+    # 显式 `--redisk` 触发，绝不隐式覆盖已有数据。
     nodisk = getattr(args, "nodisk", False)
-    if not nodisk:
-        disk.ensure_disk_image_exists(disk_path)
+    redisk = getattr(args, "redisk", False)
+    with_disk = getattr(args, "disk", False)
+    disk_mode = "redisk" if redisk else ("disk" if with_disk else ("nodisk" if nodisk else "livecd"))
+
+    if disk_mode in ("disk", "redisk"):
+        disk.ensure_disk_image_exists(disk_path, force=(disk_mode == "redisk"))
 
     cmd = [
         qemu,
         "-cdrom", config.OUTPUT_ISO,
     ]
-    if not nodisk:
+    if disk_mode in ("disk", "redisk"):
         cmd += ["-hda", disk_path]
     cmd += [
         "-boot", "order=d",
@@ -57,7 +65,6 @@ def cmd(args: argparse.Namespace) -> int:
     ]
     if args.serial:
         cmd += ["-serial", "stdio"]
-    if nodisk:
-        info("--nodisk：以纯 liveCD 形态启动（不挂载外部盘）")
+    info(f"盘策略: {disk_mode}" + (f" (挂载 {os.path.basename(disk_path)})" if disk_mode in ("disk", "redisk") else " (纯 liveCD，不挂外部盘)"))
     info(f"启动 QEMU: {os.path.basename(qemu)}")
     return subprocess.run(cmd).returncode

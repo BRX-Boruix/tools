@@ -248,9 +248,18 @@ def create_ext2_disk_image(path: str, size_mb: int = 64, label: str = "BORUIX_DA
     return True
 
 
-def ensure_disk_image_exists(path: str = DISK_IMG_PATH, size_mb: int = 64) -> str:
-    """若磁盘镜像不存在则自动创建，存在则直接沿用。"""
-    if not os.path.isfile(path):
+def ensure_disk_image_exists(path: str = DISK_IMG_PATH, size_mb: int = 64, force: bool = False) -> str:
+    """确保磁盘镜像存在。
+
+    `force=False`（默认）：仅缺失时自动创建，已存在则沿用（盘 = 持久外部
+    存储，数据需保留——ADR-013 语义）。`force=True`（--redisk）：无条件
+    重新格式化，盘内旧二进制会被清除重建为当前构建产物——用于开发期盘上
+    init/shell 落后于当前内核导致行为被旧盘带偏的场景。
+    """
+    if force:
+        info(f"强制重建磁盘镜像: {path} (清除旧盘数据)")
+        create_ext2_disk_image(path, size_mb=size_mb)
+    elif not os.path.isfile(path):
         info(f"未检测到物理磁盘镜像 {path}，正在自动创建...")
         create_ext2_disk_image(path, size_mb=size_mb)
     else:
