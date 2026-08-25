@@ -50,7 +50,7 @@ def run_qemu(qemu: str, mem: str, timeout: int) -> tuple:
     disk_path = config.PROJECT_ROOT + os.sep + "disk.img"
     # KA2（自检写盘隔离）：kernel-tests 的 m72 / ata-tail-probe 会向磁盘数据区
     # 写 scratch 标记，disk.img 跨运行持久沿用会让腐蚀在 EXT2 数据区累积——
-    # 轻则 /binaries 内容被标记覆盖，重则后续 boot 加载损坏 ELF 触发与被测
+    # 轻则 /programs 内容被标记覆盖，重则后续 boot 加载损坏 ELF 触发与被测
     # 代码无关的静默复位，污染验收结论。自检每次强制重建空白镜像：scratch
     # 只落在一次性状态上，跨启动不可见。
     if os.path.isfile(disk_path):
