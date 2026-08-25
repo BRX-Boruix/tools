@@ -37,12 +37,19 @@ def cmd(args: argparse.Namespace) -> int:
 
     disk_path = config.PROJECT_ROOT + os.sep + "disk.img"
     from . import disk
-    disk.ensure_disk_image_exists(disk_path)
+    # --nodisk（ADR-017 liveCD）：不保证、不挂载外部盘；否则缺失时自动创建
+    # （盘 = 持久外部存储模拟，缺失即重建——见 disk.ensure_disk_image_exists）。
+    nodisk = getattr(args, "nodisk", False)
+    if not nodisk:
+        disk.ensure_disk_image_exists(disk_path)
 
     cmd = [
         qemu,
         "-cdrom", config.OUTPUT_ISO,
-        "-hda", disk_path,
+    ]
+    if not nodisk:
+        cmd += ["-hda", disk_path]
+    cmd += [
         "-boot", "order=d",
         "-m", str(args.mem),
         "-netdev", "user,id=net0",
@@ -50,5 +57,7 @@ def cmd(args: argparse.Namespace) -> int:
     ]
     if args.serial:
         cmd += ["-serial", "stdio"]
+    if nodisk:
+        info("--nodisk：以纯 liveCD 形态启动（不挂载外部盘）")
     info(f"启动 QEMU: {os.path.basename(qemu)}")
     return subprocess.run(cmd).returncode

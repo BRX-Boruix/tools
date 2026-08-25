@@ -115,6 +115,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_run = sub.add_parser("run", help="用 QEMU 启动 ISO")
     p_run.add_argument("--mem", default="128M", help="内存大小（默认 128M）")
     p_run.add_argument("--serial", action="store_true", help="启用串口输出到终端")
+    p_run.add_argument(
+        "--nodisk",
+        action="store_true",
+        help="不挂载外部盘（不加 -hda），以纯 liveCD 形态启动（ADR-017）",
+    )
     p_run.set_defaults(func=run.cmd)
 
     # br 子命令：Build and Run（先构建，后启动）
@@ -180,6 +185,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_br.add_argument("--mem", default="128M", help="内存大小（默认 128M）")
     p_br.add_argument("--serial", action="store_true", help="启用串口输出到终端")
+    p_br.add_argument(
+        "--nodisk",
+        action="store_true",
+        help="不挂载外部盘（不加 -hda），以纯 liveCD 形态启动（ADR-017）",
+    )
     p_br.set_defaults(func=br.cmd)
 
     # mkimg 子命令：创建/格式化物理磁盘镜像
