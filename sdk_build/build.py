@@ -191,7 +191,7 @@ def _build_userspace() -> int:
     经 include_bytes! 嵌入——无外部盘时系统也能启动（ADR-017）。
     """
     # (源目录, 产物 bin 名)
-    programs = [("init", "init"), ("shell", "shell"), ("volumed", "volumed")]
+    programs = [("init", "init"), ("shell", "shell"), ("volumed", "volumed"), ("synce2e", "synce2e")]
     for src, bin_name in programs:
         dir_ = os.path.join(config.PROJECT_ROOT, src)
         info(f"编译用户程序 ({src} + libsys)")
@@ -232,6 +232,7 @@ def _write_binaries_payload() -> int:
         ("init.elf", "INIT_ELF"),
         ("shell.elf", "SHELL_ELF"),
         ("volumed.elf", "VOLUMED_ELF"),
+        ("synce2e.elf", "SYNCE2E_ELF"),
     ]
     missing = [
         n for n, _ in payloads if not os.path.isfile(os.path.join(kernel_crate, n))
