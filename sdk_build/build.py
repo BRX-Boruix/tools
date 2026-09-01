@@ -20,6 +20,7 @@ def _symbols_generated() -> str:
 
 def _cargo_build_kernel(
     use_tests: bool = False,
+    use_pre2: bool = False,
     use_m33: bool = False,
     use_m41: bool = False,
     use_m42: bool = False,
@@ -27,6 +28,8 @@ def _cargo_build_kernel(
     use_m44: bool = False,
     use_m5: bool = False,
     use_waitpid: bool = False,
+    use_signal: bool = False,
+    signal_halt: str = "nested",
     release: bool = False,
 ) -> int:
     """编译内核为 ELF，并在链接后提取符号表二次编译嵌入。
@@ -78,9 +81,22 @@ def _cargo_build_kernel(
     if release:
         cmd.append("--release")
     features = []
-    if use_tests or use_m33 or use_m41 or use_m42 or use_m43 or use_m44 or use_m5 or use_waitpid:
+    if use_tests or use_m33 or use_m41 or use_m42 or use_m43 or use_m44 or use_m5 or use_waitpid or use_pre2 or use_signal:
         features.append("kernel-tests")
+    if use_signal:
+        # 停机验收互斥：signal_halt 选择启用哪个 halt 测试 feature（handler/fault/nested），
+        # 各自独立 build+QEMU 运行（跑完即停）。
+        if signal_halt == "handler":
+            features.append("kernel-test-signal-handler")
+        elif signal_halt == "fault":
+            features.append("kernel-test-signal-fault")
+        else:
+            features.append("kernel-test-signal-nested")
+        info(f"ADR-034 S1-13：启用 kernel-test-signal-{signal_halt} feature，停机验收跑完即停")
         info("测试模式：启用 kernel-tests feature（编译带自检测试的内核）")
+    if use_pre2:
+        features.append("kernel-test-pre2")
+        info("ADR-034 PRE-2：启用 kernel-test-pre2 feature（用户态 #PF CR2 透传验收，跑完即停）")
     if use_m33:
         features.append("kernel-test-m33")
         info("M3.3：启用 kernel-test-m33 feature（用户态异常停机验收，跑完即停）")
@@ -292,6 +308,7 @@ def cmd(args: argparse.Namespace) -> int:
         return rc
     rc = _cargo_build_kernel(
         use_tests=getattr(args, "test", False),
+        use_pre2=getattr(args, "test_pre2", False),
         use_m33=getattr(args, "test_m33", False),
         use_m41=getattr(args, "test_m41", False),
         use_m42=getattr(args, "test_m42", False),
@@ -299,6 +316,8 @@ def cmd(args: argparse.Namespace) -> int:
         use_m44=getattr(args, "test_m44", False),
         use_m5=getattr(args, "test_m5", False),
         use_waitpid=getattr(args, "test_waitpid", False),
+        use_signal=getattr(args, "test_signal", False),
+        signal_halt=getattr(args, "signal_halt", "nested"),
         release=release,
     )
     if rc != 0:

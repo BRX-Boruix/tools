@@ -63,6 +63,27 @@ def build_parser() -> argparse.ArgumentParser:
         "该测试验收后停机、不返回主流程（不打印版本横幅），默认关闭",
     )
     p_build.add_argument(
+        "--test-pre2",
+        dest="test_pre2",
+        action="store_true",
+        help="同时启用 ADR-034 PRE-2 用户态 #PF CR2 透传验收（kernel-test-pre2 "
+        "feature）；该测试验收后停机、不返回主流程，默认关闭",
+    )
+    p_build.add_argument(
+        "--test-signal",
+        dest="test_signal",
+        action="store_true",
+        help="同时启用 ADR-034 S1-13 信号 handler/sigreturn 停机验收（kernel-test-signal "
+        "feature）；该测试验收后停机、不返回主流程，默认关闭",
+    )
+    p_build.add_argument(
+        "--signal-halt",
+        dest="signal_halt",
+        default="nested",
+        choices=["nested", "handler", "fault"],
+        help="停机验收选择跑哪个 halt 测试：nested（默认）/ handler / fault（须与 --test-signal 同用）",
+    )
+    p_build.add_argument(
         "--test-m4.1",
         dest="test_m41",
         action="store_true",
@@ -148,6 +169,27 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="同时启用 M3.3 用户态异常停机验收（kernel-test-m33 feature）；"
         "该测试验收后停机、不返回主流程（不打印版本横幅），默认关闭",
+    )
+    p_br.add_argument(
+        "--test-pre2",
+        dest="test_pre2",
+        action="store_true",
+        help="同时启用 ADR-034 PRE-2 用户态 #PF CR2 透传验收（kernel-test-pre2 "
+        "feature）；该测试验收后停机、不返回主流程，默认关闭",
+    )
+    p_br.add_argument(
+        "--test-signal",
+        dest="test_signal",
+        action="store_true",
+        help="同时启用 ADR-034 S1-13 信号 handler/sigreturn 停机验收（kernel-test-signal "
+        "feature）；该测试验收后停机、不返回主流程，默认关闭",
+    )
+    p_br.add_argument(
+        "--signal-halt",
+        dest="signal_halt",
+        default="nested",
+        choices=["nested", "handler", "fault"],
+        help="停机验收选择跑哪个 halt 测试：nested（默认）/ handler / fault（须与 --test-signal 同用）",
     )
     p_br.add_argument(
         "--test-m4.1",
