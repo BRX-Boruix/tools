@@ -18,7 +18,7 @@ BORUIX SDK 辅助工具统一入口。
 import argparse
 import sys
 
-from sdk_build import br, build, disk, limine, run
+from sdk_build import br, build, disk, limine, limine_build, run
 from sdk_build.config import DEFAULT_LIMINE_VERSION
 
 
@@ -47,6 +47,30 @@ def build_parser() -> argparse.ArgumentParser:
         help="强制重新下载（删除旧版本）",
     )
     p_limine.set_defaults(func=limine.cmd)
+
+    # limine-build 子命令：用 i686-elf 交叉编译器编译 Limine BIOS stage2
+    p_lb = sub.add_parser("limine-build", help="用 i686-elf 交叉编译器交叉编译 Limine BIOS stage2")
+    p_lb.add_argument(
+        "--check",
+        action="store_true",
+        help="仅校验交叉编译工具链是否就绪，不实际编译",
+    )
+    p_lb.add_argument(
+        "--source",
+        default=None,
+        help="待编译的 Limine 源文件（brxLimine 相对路径，如 common/fs/fat32.s2.c）；默认按缺省源清单",
+    )
+    p_lb.add_argument(
+        "--brx-dir",
+        default=None,
+        help="brxLimine 源码根目录（默认项目根下 brxLimine）",
+    )
+    p_lb.add_argument(
+        "--build-dir",
+        default=None,
+        help="编译输出目录（默认 envfiles/_limine_build）",
+    )
+    p_lb.set_defaults(func=limine_build.cmd)
 
     # build 子命令
     p_build = sub.add_parser("build", help="编译内核并生成可引导 ISO")
@@ -130,6 +154,16 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="以 release 配置构建内核（验证正式 release 形态）；默认 debug",
     )
+    p_build.add_argument(
+        "--systemdisk",
+        action="store_true",
+        help="产系统盘 systemdisk.img（--systemdisk；可与 --disk/--redisk 并存，系统盘与数据盘同时挂载）",
+    )
+    p_build.add_argument(
+        "--brxlimine",
+        action="store_true",
+        help="配合 --systemdisk：用 brxLimine fork（含 EXT2 驱动）引导装系统盘，使系统盘能从 EXT2 分区启动",
+    )
     p_build.set_defaults(func=build.cmd)
 
     # run 子命令
@@ -153,6 +187,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--nodisk",
         action="store_true",
         help="显式声明纯 LiveCD 启动（默认即此，仅供消除歧义）",
+    )
+    p_run.add_argument(
+        "--systemdisk",
+        action="store_true",
+        help="从 build 产出的系统盘 systemdisk.img 启动（-hda；可与 --disk/--redisk 并存，系统盘 -hda + 数据盘 -hdb）",
     )
     p_run.set_defaults(func=run.cmd)
 
@@ -256,6 +295,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--nodisk",
         action="store_true",
         help="显式声明纯 LiveCD 启动（默认即此，仅供消除歧义）",
+    )
+    p_br.add_argument(
+        "--systemdisk",
+        action="store_true",
+        help="从 build 产出的系统盘 systemdisk.img 启动（-hda；可与 --disk/--redisk 并存，系统盘 -hda + 数据盘 -hdb）",
     )
     p_br.set_defaults(func=br.cmd)
 

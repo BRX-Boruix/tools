@@ -25,46 +25,57 @@ def _find_qemu() -> str:
 
 
 def cmd(args: argparse.Namespace) -> int:
-    """用 QEMU 启动 ISO"""
-    if not os.path.isfile(config.OUTPUT_ISO):
-        err(f"未找到 ISO: {config.OUTPUT_ISO}，请先运行 build")
-        return 1
+    """用 QEMU 启动 ISO（默认）或系统盘（--systemdisk）。
 
+    --systemdisk 从 build 产出的 systemdisk.img 经 -hda 启动（ADR-029 安装模式）；
+    可与 --disk/--redisk 数据盘并存：系统盘挂 -hda、数据盘挂 -hdb，两个盘同时加载。
+    """
     qemu = _find_qemu()
     if not qemu:
-        err(f"未找到 {config.QEMU}，请在 .env 配置 QEMU_DIR 或加入 PATH")
+        err("未找到 " + config.QEMU + "，请在 .env 配置 QEMU_DIR 或加入 PATH")
         return 1
 
-    disk_path = config.PROJECT_ROOT + os.sep + "disk.img"
     from . import disk
-    # 盘策略三选一（main.py 用 mutually exclusive group 保证至多其一）：
-    #   默认 / `--nodisk`  → LiveCD：不挂盘，盘从未创建也不影响（ADR-017）
-    #   `--disk`           → 挂现有盘（缺失则自动创建）
-    #   `--redisk`         → 无条件重建盘再挂（清旧盘数据，用当前构建产物）
-    # 盘是"持久外部存储"模拟（ADR-013/016）：重建会清除盘上数据，故仅通过
-    # 显式 `--redisk` 触发，绝不隐式覆盖已有数据。
+    systemdisk = getattr(args, "systemdisk", False)
+    disk_path = disk.DISK_IMG_PATH
+    # 数据盘策略三选一（main.py 用 mutually exclusive group 保证至多其一）：
+    #   默认 / `--nodisk`  → 不挂数据盘（纯 liveCD 或纯系统盘）
+    #   `--disk`           → 挂现有数据盘（缺失则自动创建）
+    #   `--redisk`         → 无条件重建数据盘再挂（清旧盘数据，用当前构建产物）
     nodisk = getattr(args, "nodisk", False)
     redisk = getattr(args, "redisk", False)
     with_disk = getattr(args, "disk", False)
     disk_mode = "redisk" if redisk else ("disk" if with_disk else ("nodisk" if nodisk else "livecd"))
 
-    if disk_mode in ("disk", "redisk"):
-        disk.ensure_disk_image_exists(disk_path, force=(disk_mode == "redisk"))
-
-    cmd = [
-        qemu,
-        "-cdrom", config.OUTPUT_ISO,
-    ]
-    if disk_mode in ("disk", "redisk"):
-        cmd += ["-hda", disk_path]
-    cmd += [
-        "-boot", "order=d",
-        "-m", str(args.mem),
-        "-netdev", "user,id=net0",
-        "-device", "e1000,netdev=net0",
-    ]
+    if systemdisk:
+        # 系统盘启动：不依赖 ISO（build --systemdisk 产物即系统盘）。
+        sys_disk = disk.SYSTEM_DISK_IMG_PATH
+        if not os.path.isfile(sys_disk):
+            err("未找到系统盘 " + sys_disk + "，请先运行 build --systemdisk")
+            return 1
+        if disk_mode in ("disk", "redisk"):
+            disk.ensure_disk_image_exists(disk_path, force=(disk_mode == "redisk"))
+        cmd = [qemu, "-hda", sys_disk]
+        if disk_mode in ("disk", "redisk"):
+            cmd += ["-hdb", disk_path]
+        cmd += ["-boot", "order=c", "-m", str(args.mem),
+                "-netdev", "user,id=net0", "-device", "e1000,netdev=net0"]
+    else:
+        # ISO 启动（默认/liveCD）：
+        if not os.path.isfile(config.OUTPUT_ISO):
+            err("未找到 ISO: " + config.OUTPUT_ISO + "，请先运行 build")
+            return 1
+        if disk_mode in ("disk", "redisk"):
+            disk.ensure_disk_image_exists(disk_path, force=(disk_mode == "redisk"))
+        cmd = [qemu, "-cdrom", config.OUTPUT_ISO]
+        if disk_mode in ("disk", "redisk"):
+            cmd += ["-hda", disk_path]
+        cmd += ["-boot", "order=d", "-m", str(args.mem),
+                "-netdev", "user,id=net0", "-device", "e1000,netdev=net0"]
     if args.serial:
         cmd += ["-serial", "stdio"]
-    info(f"盘策略: {disk_mode}" + (f" (挂载 {os.path.basename(disk_path)})" if disk_mode in ("disk", "redisk") else " (纯 liveCD，不挂外部盘)"))
-    info(f"启动 QEMU: {os.path.basename(qemu)}")
+    extra = (" + 数据盘 " + os.path.basename(disk_path)) if disk_mode in ("disk", "redisk") else ""
+    info("盘策略: " + disk_mode + extra)
+    info("启动 QEMU: " + os.path.basename(qemu) + " (boot=" + ("c" if systemdisk else "d") + ")")
     return subprocess.run(cmd).returncode
+

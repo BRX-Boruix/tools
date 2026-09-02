@@ -292,6 +292,71 @@ def _write_binaries_payload() -> int:
     return 0
 
 
+def _make_system_disk(profile: str = "debug", use_fork: bool = False) -> int:
+    """生成可引导系统盘 systemdisk.img（ADR-029 安装模式）。
+
+    内容：/boot/kernel=内核 ELF、/boot/limine/limine.conf + limine-bios.sys、
+    /programs/{init,shell,volumed,synce2e}.elf（来自 _build_userspace 写入内核
+    crates 目录的真实 ELF），随后把 Limine BIOS 引导器装进盘。
+
+    use_fork=True：改用 brxLimine fork 的 stage1/stage2（stage2 内含 EXT2 驱动）
+    引导，使系统盘能从 EXT2 分区加载 stage2 并定位内核（stock 引导器不含
+    EXT2 驱动，会停在 "Stage 3 file not found"）。
+    """
+    from . import disk
+    kernel_elf = _kernel_elf(profile)
+    if not os.path.isfile(kernel_elf):
+        err("未找到内核 ELF: " + kernel_elf)
+        return 1
+    with open(kernel_elf, "rb") as f:
+        kernel = f.read()
+    programs = {}
+    for name in ("init", "shell", "volumed", "synce2e"):
+        elf = os.path.join(config.KERNEL_DIR, "crates", "kernel", name + ".elf")
+        if not os.path.isfile(elf):
+            err("未找到用户程序 ELF: " + elf)
+            return 1
+        with open(elf, "rb") as f:
+            programs[name] = f.read()
+    if not os.path.isfile(config.LIMINE_CONF):
+        err("未找到 limine.conf: " + config.LIMINE_CONF)
+        return 1
+    with open(config.LIMINE_CONF, "rb") as f:
+        limine_conf = f.read()
+    if use_fork:
+        # brxLimine fork：stage3 sys 与 stage1/2 均来自 fork 构建产物。
+        limine_bios_sys = config.BRXLIMINE_BIOS_SYS
+        if not os.path.isfile(limine_bios_sys):
+            err("未找到 fork limine-bios.sys: " + limine_bios_sys + "（先 limine-build 交叉编译 brxLimine）")
+            return 1
+        with open(limine_bios_sys, "rb") as f:
+            limine_bios = f.read()
+        if not os.path.isfile(config.BRXLIMINE_HDD_BIN):
+            err("未找到 fork limine-bios-hdd.bin: " + config.BRXLIMINE_HDD_BIN)
+            return 1
+        with open(config.BRXLIMINE_HDD_BIN, "rb") as f:
+            fork_hdd_bin = f.read()
+    else:
+        limine_bios_sys = os.path.join(config.LIMINE_BINARY_DIR, "limine-bios.sys")
+        if not os.path.isfile(limine_bios_sys):
+            err("未找到 limine-bios.sys: " + limine_bios_sys + "（先运行 limine 部署）")
+            return 1
+        with open(limine_bios_sys, "rb") as f:
+            limine_bios = f.read()
+    disk.create_system_disk_image(
+        disk.SYSTEM_DISK_IMG_PATH, kernel, programs, limine_conf, limine_bios
+    )
+    if use_fork:
+        rc = disk.install_fork_limine_bios(disk.SYSTEM_DISK_IMG_PATH, fork_hdd_bin)
+    else:
+        rc = disk.install_limine_bios(disk.SYSTEM_DISK_IMG_PATH)
+    if rc != 0:
+        return rc
+    info("系统盘已生成: " + disk.SYSTEM_DISK_IMG_PATH)
+    return 0
+
+
+
 def cmd(args: argparse.Namespace) -> int:
     """编译内核并生成可引导 ISO"""
     release = getattr(args, "release", False)
@@ -322,4 +387,10 @@ def cmd(args: argparse.Namespace) -> int:
     )
     if rc != 0:
         return rc
+    # --systemdisk：产系统盘而非 ISO（ADR-029 安装模式）。
+    if getattr(args, "systemdisk", False):
+        return _make_system_disk(
+            profile,
+            use_fork=getattr(args, "brxlimine", False),
+        )
     return _make_iso(profile)
