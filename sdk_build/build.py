@@ -207,7 +207,7 @@ def _build_userspace() -> int:
     经 include_bytes! 嵌入——无外部盘时系统也能启动（ADR-017）。
     """
     # (源目录, 产物 bin 名)
-    programs = [("init", "init"), ("shell", "shell"), ("volumed", "volumed"), ("synce2e", "synce2e")]
+    programs = [("init", "init"), ("shell", "shell"), ("volumed", "volumed"), ("synce2e", "synce2e"), ("fpcheck", "fpcheck")]
     for src, bin_name in programs:
         dir_ = os.path.join(config.PROJECT_ROOT, src)
         info(f"编译用户程序 ({src} + libsys)")
@@ -249,6 +249,7 @@ def _write_binaries_payload() -> int:
         ("shell.elf", "SHELL_ELF"),
         ("volumed.elf", "VOLUMED_ELF"),
         ("synce2e.elf", "SYNCE2E_ELF"),
+        ("fpcheck.elf", "FPCHECK_ELF"),
     ]
     missing = [
         n for n, _ in payloads if not os.path.isfile(os.path.join(kernel_crate, n))
@@ -296,7 +297,7 @@ def _make_system_disk(profile: str = "debug", use_fork: bool = False) -> int:
     """生成可引导系统盘 systemdisk.img（ADR-029 安装模式）。
 
     内容：/boot/kernel=内核 ELF、/boot/limine/limine.conf + limine-bios.sys、
-    /programs/{init,shell,volumed,synce2e}.elf（来自 _build_userspace 写入内核
+    /programs/{init,shell,volumed,synce2e,fpcheck}.elf（来自 _build_userspace 写入内核
     crates 目录的真实 ELF），随后把 Limine BIOS 引导器装进盘。
 
     use_fork=True：改用 brxLimine fork 的 stage1/stage2（stage2 内含 EXT2 驱动）
@@ -311,7 +312,7 @@ def _make_system_disk(profile: str = "debug", use_fork: bool = False) -> int:
     with open(kernel_elf, "rb") as f:
         kernel = f.read()
     programs = {}
-    for name in ("init", "shell", "volumed", "synce2e"):
+    for name in ("init", "shell", "volumed", "synce2e", "fpcheck"):
         elf = os.path.join(config.KERNEL_DIR, "crates", "kernel", name + ".elf")
         if not os.path.isfile(elf):
             err("未找到用户程序 ELF: " + elf)
