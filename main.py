@@ -193,6 +193,22 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="从 build 产出的系统盘 systemdisk.img 启动（-hda；可与 --disk/--redisk 并存，系统盘 -hda + 数据盘 -hdb）",
     )
+    # SMP 多核：默认 4 核；--no-smp 显式禁用（单核）。--smp N 与 --no-smp 互斥。
+    p_run_smp_grp = p_run.add_mutually_exclusive_group()
+    p_run_smp_grp.add_argument(
+        "--smp",
+        type=int,
+        default=4,
+        metavar="N",
+        help="启用 SMP 多核，N = CPU 核数（默认 4）",
+    )
+    p_run_smp_grp.add_argument(
+        "--no-smp",
+        dest="smp",
+        action="store_const",
+        const=None,
+        help="禁用 SMP（单核启动，不传 -smp 给 QEMU）",
+    )
     p_run.set_defaults(func=run.cmd)
 
     # br 子命令：Build and Run（先构建，后启动）
@@ -300,6 +316,22 @@ def build_parser() -> argparse.ArgumentParser:
         "--systemdisk",
         action="store_true",
         help="从 build 产出的系统盘 systemdisk.img 启动（-hda；可与 --disk/--redisk 并存，系统盘 -hda + 数据盘 -hdb）",
+    )
+    # SMP 多核：默认 4 核；--no-smp 显式禁用（单核）。--smp N 与 --no-smp 互斥。
+    p_br_smp_grp = p_br.add_mutually_exclusive_group()
+    p_br_smp_grp.add_argument(
+        "--smp",
+        type=int,
+        default=4,
+        metavar="N",
+        help="启用 SMP 多核，N = CPU 核数（默认 4）",
+    )
+    p_br_smp_grp.add_argument(
+        "--no-smp",
+        dest="smp",
+        action="store_const",
+        const=None,
+        help="禁用 SMP（单核启动，不传 -smp 给 QEMU）",
     )
     p_br.set_defaults(func=br.cmd)
 

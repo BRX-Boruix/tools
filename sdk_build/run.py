@@ -47,6 +47,11 @@ def cmd(args: argparse.Namespace) -> int:
     with_disk = getattr(args, "disk", False)
     disk_mode = "redisk" if redisk else ("disk" if with_disk else ("nodisk" if nodisk else "livecd"))
 
+    # SMP 多核：--smp N（默认 4）→ -smp N；--no-smp（None）→ 不传，单核启动。
+    # 加 -cpu max 以启用现代 CPU 特性（多核下 APIC 拓扑/LAPIC id 分布更贴近真机）。
+    smp_n = getattr(args, "smp", 4)
+    smp_args = ["-cpu", "max", "-smp", str(smp_n)] if smp_n is not None else []
+
     if systemdisk:
         # 系统盘启动：不依赖 ISO（build --systemdisk 产物即系统盘）。
         sys_disk = disk.SYSTEM_DISK_IMG_PATH
@@ -60,6 +65,7 @@ def cmd(args: argparse.Namespace) -> int:
             cmd += ["-hdb", disk_path]
         cmd += ["-boot", "order=c", "-m", str(args.mem),
                 "-netdev", "user,id=net0", "-device", "e1000,netdev=net0"]
+        cmd += smp_args
     else:
         # ISO 启动（默认/liveCD）：
         if not os.path.isfile(config.OUTPUT_ISO):
@@ -72,10 +78,13 @@ def cmd(args: argparse.Namespace) -> int:
             cmd += ["-hda", disk_path]
         cmd += ["-boot", "order=d", "-m", str(args.mem),
                 "-netdev", "user,id=net0", "-device", "e1000,netdev=net0"]
+        cmd += smp_args
     if args.serial:
         cmd += ["-serial", "stdio"]
     extra = (" + 数据盘 " + os.path.basename(disk_path)) if disk_mode in ("disk", "redisk") else ""
     info("盘策略: " + disk_mode + extra)
+    smp_desc = ("SMP " + str(smp_n) + " 核") if smp_n is not None else "单核 (no SMP)"
+    info("CPU 拓扑: " + smp_desc)
     info("启动 QEMU: " + os.path.basename(qemu) + " (boot=" + ("c" if systemdisk else "d") + ")")
     return subprocess.run(cmd).returncode
 
