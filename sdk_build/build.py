@@ -207,7 +207,7 @@ def _build_userspace() -> int:
     经 include_bytes! 嵌入——无外部盘时系统也能启动（ADR-017）。
     """
     # (源目录, 产物 bin 名)
-    programs = [("init", "init"), ("shell", "shell"), ("volumed", "volumed"), ("synce2e", "synce2e"), ("fpcheck", "fpcheck")]
+    programs = [("init", "init"), ("shell", "shell"), ("volumed", "volumed"), ("synce2e", "synce2e"), ("fpcheck", "fpcheck"), ("spinburn", "spinburn")]
     for src, bin_name in programs:
         dir_ = os.path.join(config.PROJECT_ROOT, src)
         info(f"编译用户程序 ({src} + libsys)")
@@ -250,6 +250,7 @@ def _write_binaries_payload() -> int:
         ("volumed.elf", "VOLUMED_ELF"),
         ("synce2e.elf", "SYNCE2E_ELF"),
         ("fpcheck.elf", "FPCHECK_ELF"),
+        ("spinburn.elf", "SPINBURN_ELF"),
     ]
     missing = [
         n for n, _ in payloads if not os.path.isfile(os.path.join(kernel_crate, n))
@@ -312,7 +313,7 @@ def _make_system_disk(profile: str = "debug", use_fork: bool = False) -> int:
     with open(kernel_elf, "rb") as f:
         kernel = f.read()
     programs = {}
-    for name in ("init", "shell", "volumed", "synce2e", "fpcheck"):
+    for name in ("init", "shell", "volumed", "synce2e", "fpcheck", "spinburn"):
         elf = os.path.join(config.KERNEL_DIR, "crates", "kernel", name + ".elf")
         if not os.path.isfile(elf):
             err("未找到用户程序 ELF: " + elf)
