@@ -231,11 +231,16 @@ def _build_userspace() -> int:
     # T2-0：freestanding C 程序（x86-64 clang/lld 交叉链 + csrc/crt0+crtrt，零 Rust libc）。
     # 经 csrc/build_c.py 编译并复制到 crates/kernel/<name>.elf。
     c_build = os.path.join(config.PROJECT_ROOT, "csrc", "build_c.py")
-    c_progs = [("chelldemo", "prog")]
+    # (name, src_dir, extra_rt...) — pthread 程序需 thread.c+pthread.c 运行时。
+    c_progs = [
+        ("chelldemo", "prog", []),
+        ("pthreaddemo", "prog", ["thread.c", "pthread.c"]),
+    ]
     c_build_dir = os.path.join(config.PROJECT_ROOT, "csrc", "_build")
-    for cname, csrcdir in c_progs:
+    for cprog in c_progs:
+        cname, csrcdir, extra_rt = cprog[0], cprog[1], cprog[2]
         info(f"编译 C 程序 ({cname}, freestanding clang/lld)")
-        r = subprocess.run(["python", c_build, cname, csrcdir, c_build_dir], cwd=os.path.join(config.PROJECT_ROOT, "csrc"))
+        r = subprocess.run(["python", c_build, cname, csrcdir, c_build_dir] + extra_rt, cwd=os.path.join(config.PROJECT_ROOT, "csrc"))
         if r.returncode != 0:
             err(f"C 程序 {cname} 编译失败")
             return r.returncode
@@ -271,6 +276,7 @@ def _write_binaries_payload() -> int:
         ("spinburn.elf", "SPINBURN_ELF"),
         ("threaddemo.elf", "THREADDEMO_ELF"),
         ("chelldemo.elf", "CHELLDEMO_ELF"),
+        ("pthreaddemo.elf", "PTHREADDEMO_ELF"),
     ]
     missing = [
         n for n, _ in payloads if not os.path.isfile(os.path.join(kernel_crate, n))
