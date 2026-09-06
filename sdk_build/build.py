@@ -236,6 +236,7 @@ def _build_userspace() -> int:
         ("chelldemo", "prog", []),
         ("pthreaddemo", "prog", ["thread.c", "pthread.c"]),
         ("pthread_syncdemo", "prog", ["thread.c", "pthread.c", "pthread_sync.c"]),
+        ("pthread_bench", "prog", ["thread.c", "pthread.c", "pthread_sync.c", "stdio.c"]),
     ]
     c_build_dir = os.path.join(config.PROJECT_ROOT, "csrc", "_build")
     for cprog in c_progs:
@@ -279,6 +280,7 @@ def _write_binaries_payload() -> int:
         ("chelldemo.elf", "CHELLDEMO_ELF"),
         ("pthreaddemo.elf", "PTHREADDEMO_ELF"),
         ("pthread_syncdemo.elf", "PTHREAD_SYNCDEMO_ELF"),
+        ("pthread_bench.elf", "PTHREAD_BENCH_ELF"),
     ]
     missing = [
         n for n, _ in payloads if not os.path.isfile(os.path.join(kernel_crate, n))
