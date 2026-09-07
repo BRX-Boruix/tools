@@ -34,10 +34,16 @@ _INODE_SIZE = 128
 _INODES_PER_GROUP = 1024
 _BLOCKS_PER_GROUP = 8192
 _PER_BLOCK = _BS // 4   # 每间接块指针数 = 256
-# 元数据块：super=1, bgdesc=2, blockbitmap=3, inodebitmap=4,
-# inode 表占 1024*128/1024=128 块（块 5..132），首个数据块 = 133。
+# 每组 inode 表占 1024*128/1024=128 块。
 _INODE_TABLE_BLOCKS = (_INODES_PER_GROUP * _INODE_SIZE) // _BS
-_FIRST_DATA_BLOCK = 5 + _INODE_TABLE_BLOCKS
+# 标准多块组 EXT2（1K 块 → s_first_data_block=1，块 0 保留；superblock@1、
+# GDT@2 起连续；随后各块组真实铺 block_bitmap/inode_bitmap/inode 表，数据区在
+# 所有元数据之后由 _BlockAllocator 跨组全局分配）。每个已用块都在其所属块组
+# （blk//_BLOCKS_PER_GROUP）的位图置位，kernel 写路径与数据盘挂载自洽。
+# 所有 inode 只放 group 0（ino ≤ _INODES_PER_GROUP），以兼容 brxLimine fork
+# stage2 的 ext2 驱动——它用 (ino-1)/blocks_per_group 定组、并从 group0 连续
+# inode 表线性读 inode，仅当全部 inode 落在首组表内才正确。
+_GROUP_META_BLOCKS = 2 + _INODE_TABLE_BLOCKS  # 每组=block_bitmap(1)+inode_bitmap(1)+inode表
 
 # 目录条目使用 d_type（file_type 字节），须在 superblock 声明
 # EXT2_FEATURE_INCOMPAT_FILETYPE；否则严格解析器（含 Limine stage2 的 ext2
@@ -104,8 +110,8 @@ class _BlockAllocator:
     最终内容全 0 未经 pending 触碰，也必须在块位图置位，否则文件系统与位图
     不一致会让后续写入方把已占用块当空闲块分配出去、覆写既有数据。
     """
-    def __init__(self):
-        self.next = _FIRST_DATA_BLOCK
+    def __init__(self, start=None):
+        self.next = start if start is not None else 133
         self.pending = {}
         self.used = set()
     def alloc(self):
@@ -274,9 +280,27 @@ def _write_ext2_filesystem(path, part_start_lba, part_sectors, files, label):
     -> 写 superblock/bgdesc/位图/inode 表/目录块/数据块。返回 True。"""
     part_byte_offset = part_start_lba * 512
     total_blocks = (part_sectors * 512) // _BS
+    # 块组数：EXT2 规范 s_blocks_per_group 由块大小决定（1K 块 → 8192）。
+    num_groups = (total_blocks + _BLOCKS_PER_GROUP - 1) // _BLOCKS_PER_GROUP
+    gdt_blocks = (num_groups * 32 + _BS - 1) // _BS  # 组描述符表占块数（每项 32B）
+    # 磁盘布局（块号，fdb=1 → 块 0 保留）：
+    #   1                 superblock
+    #   2 .. 1+gdt_blocks GDT（num_groups 项，连续）
+    #   之后每块组 g：block_bitmap_g, inode_bitmap_g, inode_table_g(_GROUP_META_BLOCKS)
+    #   数据区从 group_meta_end 起，由 _BlockAllocator 跨组全局分配。
+    gdt_start = 2
+    group_meta = []  # (block_bitmap_blk, inode_bitmap_blk, inode_table_blk)
+    cur = gdt_start + gdt_blocks  # group0 元数据紧随 GDT 之后（superblock@1、GDT@gdt_start）
+    for _g in range(num_groups):
+        group_meta.append((cur, cur + 1, cur + 2))
+        cur += _GROUP_META_BLOCKS
+    data_start = cur
+    # 元数据块号集合（含块 0 保留区），用于组 0 位图置位（全部 < blocks_per_group）。
+    meta_blocks = set(range(0, data_start))
+
     tree = _build_file_tree(files)
     assigned, inode_count = _assign_inodes(tree)
-    alloc = _BlockAllocator()
+    alloc = _BlockAllocator(start=data_start)
     inode_meta = {}
     dir_entries = {}
     dir_parent = {}
@@ -306,41 +330,60 @@ def _write_ext2_filesystem(path, part_start_lba, part_sectors, files, label):
             inode_meta[ino] = (EXT2_S_IFREG | 0o644, size, i_block, sectors)
     walk(assigned, 2)
 
-    used_blocks = set(range(0, _FIRST_DATA_BLOCK))
-    # 位图必须覆盖 allocator 分发的每一块（含目录/数据/间接块），而非仅 pending
-    # 里有过非空内容的块——漏标会使后续写入方复用已占用块、覆写既有数据。
+    # 位图必须覆盖 allocator 分发的每一块（含目录/数据/间接块）+ 全部元数据块。
+    used_blocks = set(meta_blocks)
     used_blocks.update(alloc.used)
     max_used = max(used_blocks) if used_blocks else 0
     if max_used >= total_blocks:
         raise ValueError("EXT2 块分配超出盘容量: up to " + str(max_used) + ", total " + str(total_blocks))
-    block_bitmap = bytearray(_BS)
+
+    # 每块组的块位图：把每个已用块置位到其所属块组（blk//bpg）的位图。
+    group_bbitmaps = [bytearray(_BS) for _ in range(num_groups)]
     for blk in used_blocks:
-        block_bitmap[blk >> 3] |= (1 << (blk & 7))
-    inode_bitmap = bytearray(_BS)
+        g = blk // _BLOCKS_PER_GROUP
+        if g >= num_groups:
+            continue  # 越界块（不应发生，见上面 max_used 检查）
+        bit = blk % _BLOCKS_PER_GROUP
+        group_bbitmaps[g][bit >> 3] |= (1 << (bit & 7))
+    # 每块组的 inode 位图：所有 inode 放 group 0（兼容 fork 驱动 group 换算）。
+    group_ibitmaps = [bytearray(_BS) for _ in range(num_groups)]
     for ino in range(1, inode_count + 1):
-        inode_bitmap[ino >> 3] |= (1 << (ino & 7))
-    free_blocks = total_blocks - len(used_blocks)
-    free_inodes = _INODES_PER_GROUP - inode_count
+        if ino > _INODES_PER_GROUP:
+            raise ValueError("inode 超出 group0 容量（fork 驱动约束）: " + str(inode_count))
+        group_ibitmaps[0][ino >> 3] |= (1 << (ino & 7))
+
+    free_blocks_total = total_blocks - len(used_blocks)
+    total_inodes = _INODES_PER_GROUP * num_groups
+    free_inodes_total = total_inodes - inode_count
+    # 每块组的空闲块/空闲 inode 计数（组 g 覆盖 [g*bpg, (g+1)*bpg) ∩ [0,total_blocks)）。
+    grp_free_blocks = []
+    for g in range(num_groups):
+        lo = g * _BLOCKS_PER_GROUP
+        hi = min((g + 1) * _BLOCKS_PER_GROUP, total_blocks)
+        span = max(0, hi - lo)
+        used_in_group = sum(1 for b in used_blocks if lo <= b < hi)
+        grp_free_blocks.append(span - used_in_group)
+    grp_free_inodes = [_INODES_PER_GROUP - (inode_count if g == 0 else 0) for g in range(num_groups)]
 
     with open(path, "r+b") as f:
         f.seek(part_byte_offset + _BS)
         sb = bytearray(1024)
-        struct.pack_into("<I", sb, 0, _INODES_PER_GROUP)
+        struct.pack_into("<I", sb, 0, total_inodes)
         struct.pack_into("<I", sb, 4, total_blocks)
         struct.pack_into("<I", sb, 8, total_blocks // 20)
-        struct.pack_into("<I", sb, 12, free_blocks)
-        struct.pack_into("<I", sb, 16, free_inodes)
-        struct.pack_into("<I", sb, 20, 1)
-        struct.pack_into("<I", sb, 24, 0)
-        struct.pack_into("<I", sb, 28, 0)
-        struct.pack_into("<I", sb, 32, _BLOCKS_PER_GROUP)
-        struct.pack_into("<I", sb, 36, _BLOCKS_PER_GROUP)
-        struct.pack_into("<I", sb, 40, _INODES_PER_GROUP)
+        struct.pack_into("<I", sb, 12, free_blocks_total)
+        struct.pack_into("<I", sb, 16, free_inodes_total)
+        struct.pack_into("<I", sb, 20, 1)                       # s_first_data_block=1（1K 块规范）
+        struct.pack_into("<I", sb, 24, 0)                       # s_log_block_size=0 → 1024
+        struct.pack_into("<I", sb, 28, 0)                       # s_log_frag_size=0
+        struct.pack_into("<I", sb, 32, _BLOCKS_PER_GROUP)       # s_blocks_per_group
+        struct.pack_into("<I", sb, 36, _BLOCKS_PER_GROUP)       # s_frags_per_group
+        struct.pack_into("<I", sb, 40, _INODES_PER_GROUP)       # s_inodes_per_group
         struct.pack_into("<H", sb, 56, EXT2_SUPER_MAGIC)
-        struct.pack_into("<H", sb, 58, 1)
-        struct.pack_into("<H", sb, 62, 0)
-        struct.pack_into("<I", sb, 76, 1)
-        struct.pack_into("<I", sb, 84, 11)
+        struct.pack_into("<H", sb, 58, 1)                       # s_state=clean
+        struct.pack_into("<H", sb, 62, 0)                       # s_errors
+        struct.pack_into("<I", sb, 76, 1)                       # s_rev_level=1 (dynamic)
+        struct.pack_into("<I", sb, 84, 11)                      # s_first_ino
         struct.pack_into("<H", sb, 88, _INODE_SIZE)
         struct.pack_into("<I", sb, 96, EXT2_FEATURE_INCOMPAT_FILETYPE)  # 声明 d_type 的 FILETYPE 不兼容特性
         label_bytes = label.encode("utf-8")[:16]
@@ -348,34 +391,43 @@ def _write_ext2_filesystem(path, part_start_lba, part_sectors, files, label):
         sb[104:120] = uuid.uuid4().bytes
         f.write(sb)
 
-        f.seek(part_byte_offset + 2 * _BS)
-        bg = bytearray(1024)
-        struct.pack_into("<I", bg, 0, 3)
-        struct.pack_into("<I", bg, 4, 4)
-        struct.pack_into("<I", bg, 8, 5)
-        struct.pack_into("<H", bg, 12, free_blocks)
-        struct.pack_into("<H", bg, 14, free_inodes)
-        struct.pack_into("<H", bg, 16, sum(1 for mode, _, _, _ in inode_meta.values() if mode & EXT2_S_IFDIR))
-        f.write(bg)
+        # GDT：从块 gdt_start 起，num_groups 项连续，每项 32B。
+        gdt = bytearray(gdt_blocks * _BS)
+        for g in range(num_groups):
+            bb, ib, it = group_meta[g]
+            off = g * 32
+            struct.pack_into("<I", gdt, off + 0, bb)
+            struct.pack_into("<I", gdt, off + 4, ib)
+            struct.pack_into("<I", gdt, off + 8, it)
+            struct.pack_into("<H", gdt, off + 12, grp_free_blocks[g])
+            struct.pack_into("<H", gdt, off + 14, grp_free_inodes[g])
+            dircnt = sum(1 for m, _, _, _ in inode_meta.values() if m & EXT2_S_IFDIR) if g == 0 else 0
+            struct.pack_into("<H", gdt, off + 16, dircnt)
+        f.seek(part_byte_offset + gdt_start * _BS)
+        f.write(gdt)
 
-        f.seek(part_byte_offset + 3 * _BS)
-        f.write(block_bitmap)
-        f.seek(part_byte_offset + 4 * _BS)
-        f.write(inode_bitmap)
-
-        itab = part_byte_offset + 5 * _BS
-        for ino, (mode, size, ib, sectors) in inode_meta.items():
-            inode = bytearray(_INODE_SIZE)
-            struct.pack_into("<H", inode, 0, mode)
-            struct.pack_into("<I", inode, 4, size)
-            struct.pack_into("<I", inode, 28, sectors)
-            # i_links_count @26（目录>=2，含 . 与 ..；普通文件=1）；osd1@36 保持 0。
-            struct.pack_into("<H", inode, 26, 2 if mode & EXT2_S_IFDIR else 1)
-            for j, blk in enumerate(ib):
-                if blk:
-                    struct.pack_into("<I", inode, 40 + j * 4, blk)
-            f.seek(itab + (ino - 1) * _INODE_SIZE)
-            f.write(inode)
+        # 每块组的 block/inode 位图与 inode 表。
+        for g in range(num_groups):
+            bb, ib, it = group_meta[g]
+            f.seek(part_byte_offset + bb * _BS)
+            f.write(group_bbitmaps[g])
+            f.seek(part_byte_offset + ib * _BS)
+            f.write(group_ibitmaps[g])
+            if g != 0:
+                continue  # inode 只写 group 0（其它组 inode 表保持全 0）
+            itab = part_byte_offset + it * _BS
+            for ino, (mode, size, iblocks, sectors) in inode_meta.items():
+                inode = bytearray(_INODE_SIZE)
+                struct.pack_into("<H", inode, 0, mode)
+                struct.pack_into("<I", inode, 4, size)
+                struct.pack_into("<I", inode, 28, sectors)
+                # i_links_count @26（目录>=2，含 . 与 ..；普通文件=1）；osd1@36 保持 0。
+                struct.pack_into("<H", inode, 26, 2 if mode & EXT2_S_IFDIR else 1)
+                for j, blk in enumerate(iblocks):
+                    if blk:
+                        struct.pack_into("<I", inode, 40 + j * 4, blk)
+                f.seek(itab + (ino - 1) * _INODE_SIZE)
+                f.write(inode)
 
         # 目录块内容：加 . 与 ..
         for ino, (mode, size, ib, sectors) in inode_meta.items():
@@ -389,7 +441,7 @@ def _write_ext2_filesystem(path, part_start_lba, part_sectors, files, label):
         # 文件数据
         for ino, (i_block, data) in file_data.items():
             _write_file_data(alloc, i_block, data)
-        # 统一写 alloc.pending
+        # 统一写 alloc.pending（目录块 + 文件数据 + 间接表，均为已分配的数据区块）
         for blk, buf in alloc.pending.items():
             f.seek(part_byte_offset + blk * _BS)
             f.write(bytes(buf))
