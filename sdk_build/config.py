@@ -8,16 +8,9 @@ import os
 # 路径
 SDK_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PROJECT_ROOT = os.path.dirname(SDK_DIR)
-BOOT_DIR = os.path.join(SDK_DIR, "boot")
-LIMINE_BINARY_DIR = os.path.join(BOOT_DIR, "limine-binary")
 KERNEL_DIR = os.path.join(PROJECT_ROOT, "kernel")
 LIMINE_CONF = os.path.join(SDK_DIR, "limine.conf")
-LIMINE_TOOL = os.path.join(LIMINE_BINARY_DIR, "limine-tool-windows-x86", "limine.exe")
 ENV_FILE = os.path.join(PROJECT_ROOT, ".env")
-
-# Limine GitHub release 二进制下载地址
-LIMINE_RELEASES = "https://github.com/Limine-Bootloader/Limine/releases/download"
-DEFAULT_LIMINE_VERSION = "12.5.2"
 
 # 构建目标（当前仅 x86_64）
 TARGET = "x86_64-unknown-none"
@@ -32,6 +25,7 @@ BRXLIMINE_DIR = os.path.join(PROJECT_ROOT, "brxLimine")
 # brxLimine 构建产物目录（含 EXT2 驱动的 BIOS stage1/2）
 BRXLIMINE_BIN_DIR = os.path.join(BRXLIMINE_DIR, "bin")
 BRXLIMINE_HDD_BIN = os.path.join(BRXLIMINE_BIN_DIR, "limine-bios-hdd.bin")
+BRXLIMINE_CD_BIN = os.path.join(BRXLIMINE_BIN_DIR, "limine-bios-cd.bin")
 BRXLIMINE_BIOS_SYS = os.path.join(BRXLIMINE_BIN_DIR, "limine-bios.sys")
 
 

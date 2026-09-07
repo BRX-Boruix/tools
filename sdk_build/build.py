@@ -143,25 +143,26 @@ def _cargo_build_kernel(
 
 
 def _make_iso(profile: str = "debug") -> int:
-    """用 xorriso 生成 BIOS+UEFI 混合引导 ISO"""
+    """用 xorriso 生成 BIOS-only 引导 ISO（完全走 brxLimine fork，不依赖官方 limine-binary）"""
+    from . import disk
     iso_root = os.path.join(config.SDK_DIR, "iso_root")
     if os.path.isdir(iso_root):
         shutil.rmtree(iso_root)
     os.makedirs(os.path.join(iso_root, "boot", "limine"), exist_ok=True)
-    os.makedirs(os.path.join(iso_root, "EFI", "BOOT"), exist_ok=True)
 
     # 拷贝内核
     shutil.copy(_kernel_elf(profile), os.path.join(iso_root, "boot", "kernel"))
     # 拷贝 limine.conf
     shutil.copy(config.LIMINE_CONF, os.path.join(iso_root, "boot", "limine", "limine.conf"))
 
-    lb = config.LIMINE_BINARY_DIR
-    # BIOS
-    shutil.copy(os.path.join(lb, "limine-bios-cd.bin"), os.path.join(iso_root, "boot", "limine", "limine-bios-cd.bin"))
-    shutil.copy(os.path.join(lb, "limine-bios.sys"), os.path.join(iso_root, "boot", "limine", "limine-bios.sys"))
-    # UEFI
-    shutil.copy(os.path.join(lb, "limine-uefi-cd.bin"), os.path.join(iso_root, "boot", "limine", "limine-uefi-cd.bin"))
-    shutil.copy(os.path.join(lb, "BOOTX64.EFI"), os.path.join(iso_root, "EFI", "BOOT", "BOOTX64.EFI"))
+    # brxLimine fork 产物（BIOS stage1 cd + stage2 sys）
+    fork_cd = config.BRXLIMINE_CD_BIN
+    fork_sys = config.BRXLIMINE_BIOS_SYS
+    if not os.path.isfile(fork_cd) or not os.path.isfile(fork_sys):
+        err(f"缺 brxLimine fork 引导产物: {fork_cd} / {fork_sys}\n请先 limine-build 交叉编译 brxLimine 生成 bin/文件")
+        return 1
+    shutil.copy(fork_cd, os.path.join(iso_root, "boot", "limine", "limine-bios-cd.bin"))
+    shutil.copy(fork_sys, os.path.join(iso_root, "boot", "limine", "limine-bios.sys"))
 
     xorriso = shutil.which("xorriso") or r"C:\ffmpeg\bin\xorriso.exe"
     if not os.path.isfile(xorriso):
@@ -174,8 +175,7 @@ def _make_iso(profile: str = "debug") -> int:
         xorriso, "-as", "mkisofs",
         "-b", "boot/limine/limine-bios-cd.bin",
         "-no-emul-boot", "-boot-load-size", "4", "-boot-info-table",
-        "--efi-boot", "boot/limine/limine-uefi-cd.bin",
-        "-efi-boot-part", "--efi-boot-image", "--protective-msdos-label",
+        "--protective-msdos-label",
         "iso_root", "-o", config.OUTPUT_ISO,
     ]
     r = subprocess.run(cmd, cwd=config.SDK_DIR)
@@ -183,15 +183,12 @@ def _make_iso(profile: str = "debug") -> int:
         err("xorriso 生成 ISO 失败")
         return r.returncode
 
-    # BIOS 引导安装
-    if not os.path.isfile(config.LIMINE_TOOL):
-        err(f"未找到 limine 工具: {config.LIMINE_TOOL}")
-        return 1
-    info("运行 limine bios-install ...")
-    r = subprocess.run([config.LIMINE_TOOL, "bios-install", config.OUTPUT_ISO])
-    if r.returncode != 0:
-        err("limine bios-install 失败")
-        return r.returncode
+    # 把 fork stage1（isohybrid MBR 启动区）写进 ISO：等价于 `limine bios-install`，但数据来自 fork，不依赖官方 limine.exe
+    with open(fork_cd, "rb") as f:
+        fork_cd_bin = f.read()
+    rc = disk.install_fork_limine_iso(config.OUTPUT_ISO, fork_cd_bin)
+    if rc != 0:
+        return rc
 
     shutil.rmtree(iso_root)
     info(f"ISO 已生成: {config.OUTPUT_ISO}")
@@ -324,16 +321,16 @@ def _write_binaries_payload() -> int:
     return 0
 
 
-def _make_system_disk(profile: str = "debug", use_fork: bool = False) -> int:
+def _make_system_disk(profile: str = "debug") -> int:
     """生成可引导系统盘 systemdisk.img（ADR-029 安装模式）。
 
     内容：/boot/kernel=内核 ELF、/boot/limine/limine.conf + limine-bios.sys、
     /programs/{init,shell,volumed,synce2e,fpcheck}.elf（来自 _build_userspace 写入内核
     crates 目录的真实 ELF），随后把 Limine BIOS 引导器装进盘。
 
-    use_fork=True：改用 brxLimine fork 的 stage1/stage2（stage2 内含 EXT2 驱动）
-    引导，使系统盘能从 EXT2 分区加载 stage2 并定位内核（stock 引导器不含
-    EXT2 驱动，会停在 "Stage 3 file not found"）。
+    完全走 brxLimine fork 的 stage1/stage2（stage2 内含 EXT2 驱动）引导，
+    使系统盘能从 EXT2 分区加载 stage2 并定位内核（stock 引导器不含 EXT2
+    驱动，会停在 "Stage 3 file not found"）。不依赖官方 limine-binary。
     """
     from . import disk
     kernel_elf = _kernel_elf(profile)
@@ -355,33 +352,22 @@ def _make_system_disk(profile: str = "debug", use_fork: bool = False) -> int:
         return 1
     with open(config.LIMINE_CONF, "rb") as f:
         limine_conf = f.read()
-    if use_fork:
-        # brxLimine fork：stage3 sys 与 stage1/2 均来自 fork 构建产物。
-        limine_bios_sys = config.BRXLIMINE_BIOS_SYS
-        if not os.path.isfile(limine_bios_sys):
-            err("未找到 fork limine-bios.sys: " + limine_bios_sys + "（先 limine-build 交叉编译 brxLimine）")
-            return 1
-        with open(limine_bios_sys, "rb") as f:
-            limine_bios = f.read()
-        if not os.path.isfile(config.BRXLIMINE_HDD_BIN):
-            err("未找到 fork limine-bios-hdd.bin: " + config.BRXLIMINE_HDD_BIN)
-            return 1
-        with open(config.BRXLIMINE_HDD_BIN, "rb") as f:
-            fork_hdd_bin = f.read()
-    else:
-        limine_bios_sys = os.path.join(config.LIMINE_BINARY_DIR, "limine-bios.sys")
-        if not os.path.isfile(limine_bios_sys):
-            err("未找到 limine-bios.sys: " + limine_bios_sys + "（先运行 limine 部署）")
-            return 1
-        with open(limine_bios_sys, "rb") as f:
-            limine_bios = f.read()
+    # brxLimine fork：stage3 sys 与 stage1/2 均来自 fork 构建产物。
+    limine_bios_sys = config.BRXLIMINE_BIOS_SYS
+    if not os.path.isfile(limine_bios_sys):
+        err("未找到 fork limine-bios.sys: " + limine_bios_sys + "（先 limine-build 交叉编译 brxLimine）")
+        return 1
+    with open(limine_bios_sys, "rb") as f:
+        limine_bios = f.read()
+    if not os.path.isfile(config.BRXLIMINE_HDD_BIN):
+        err("未找到 fork limine-bios-hdd.bin: " + config.BRXLIMINE_HDD_BIN)
+        return 1
+    with open(config.BRXLIMINE_HDD_BIN, "rb") as f:
+        fork_hdd_bin = f.read()
     disk.create_system_disk_image(
         disk.SYSTEM_DISK_IMG_PATH, kernel, programs, limine_conf, limine_bios
     )
-    if use_fork:
-        rc = disk.install_fork_limine_bios(disk.SYSTEM_DISK_IMG_PATH, fork_hdd_bin)
-    else:
-        rc = disk.install_limine_bios(disk.SYSTEM_DISK_IMG_PATH)
+    rc = disk.install_fork_limine_bios(disk.SYSTEM_DISK_IMG_PATH, fork_hdd_bin)
     if rc != 0:
         return rc
     info("系统盘已生成: " + disk.SYSTEM_DISK_IMG_PATH)
@@ -419,10 +405,7 @@ def cmd(args: argparse.Namespace) -> int:
     )
     if rc != 0:
         return rc
-    # --systemdisk：产系统盘而非 ISO（ADR-029 安装模式）。
+    # --systemdisk：产系统盘而非 ISO（ADR-029 安装模式，恒走 brxLimine fork）。
     if getattr(args, "systemdisk", False):
-        return _make_system_disk(
-            profile,
-            use_fork=getattr(args, "brxlimine", False),
-        )
+        return _make_system_disk(profile)
     return _make_iso(profile)

@@ -419,7 +419,7 @@ def create_system_disk_image(path, kernel_elf, programs, limine_conf, limine_bio
     - /boot/limine/limine.conf         = limine_conf
     - /boot/limine/limine-bios.sys     = limine_bios_sys（Limine stage2）
     - /programs/<name>.elf             = programs 字典 {name: bytes}
-    （Limine 引导器安装另由 install_limine_bios 完成）
+    （Limine 引导器安装另由 install_fork_limine_bios 完成）
     返回 True。"""
     total_bytes = size_mb * 1024 * 1024
     total_sectors = total_bytes // 512
@@ -439,21 +439,6 @@ def create_system_disk_image(path, kernel_elf, programs, limine_conf, limine_bio
     _write_ext2_filesystem(path, start, sectors, files, "BORUIX_SYS")
     info("系统盘 EXT2 已写入: " + path)
     return True
-
-
-def install_limine_bios(disk_path):
-    """把 Limine BIOS stage1+stage2 装进系统盘（limine bios-install）。
-    返回 0 成功，非 0 失败。"""
-    if not os.path.isfile(config.LIMINE_TOOL):
-        err("未找到 limine 工具: " + config.LIMINE_TOOL + "（先运行 limine 部署）")
-        return 1
-    info("安装 Limine BIOS 引导到 " + os.path.basename(disk_path) + " ...")
-    r = subprocess.run([config.LIMINE_TOOL, "bios-install", disk_path])
-    if r.returncode != 0:
-        err("limine bios-install 失败")
-    return r.returncode
-
-
 
 
 def install_fork_limine_bios(disk_path, fork_hdd_bin):
@@ -491,6 +476,42 @@ def install_fork_limine_bios(disk_path, fork_hdd_bin):
         f.write(bytes(img))
     info("brxLimine fork BIOS 引导安装完成（MBR + 隐藏区 stage2 含 EXT2）。")
     return 0
+
+def install_fork_limine_iso(iso_path, fork_cd_bin):
+    """把 brxLimine fork 的 Limine BIOS stage1+2 写进 isohybrid ISO（等价于 `limine bios-install`）。
+
+    xorriso 用 --protective-msdos-label 产生的 ISO 已具有 MBR 保护分区（
+    El Torito 启动影像为 boot/limine/limine-bios-cd.bin）。此函数把 stage1
+    启动区（[0:512]）写到 MBR、stage2（[512:]）写到 0x200，并在 0x1a4
+    硬编码 stage2 位置，与官方 bios-install 对 MBR 的写入模型一致。
+    不改动已传入的保护分区表/时间戳字段。返回 0 成功，非 0 失败。
+    """
+    if not os.path.isfile(iso_path):
+        err("ISO 不存在: " + iso_path)
+        return 1
+    if len(fork_cd_bin) < 512:
+        err("fork limine-bios-cd.bin 尺寸异常: %d 字节" % len(fork_cd_bin))
+        return 1
+    info("写入 brxLimine fork BIOS 引导到 ISO (isohybrid MBR + stage2@0x200) ...")
+    with open(iso_path, "rb") as f:
+        img = bytearray(f.read())
+    if len(img) < 0x200 + (len(fork_cd_bin) - 512):
+        err("ISO 太小，无法写入 stage2")
+        return 1
+    # 保备并恢复：保护分区表(440..510) 与 BIOS 时间戳(218..224)。
+    orig_mbr = bytes(img[440:440 + 70])
+    ts = bytes(img[218:218 + 6])
+    img[0:512] = fork_cd_bin[0:512]
+    stage2_loc = 0x200
+    img[stage2_loc:stage2_loc + len(fork_cd_bin) - 512] = fork_cd_bin[512:]
+    img[0x1A4:0x1AC] = struct.pack("<Q", stage2_loc)
+    img[218:224] = ts
+    img[440:510] = orig_mbr
+    with open(iso_path, "wb") as f:
+        f.write(bytes(img))
+    info("brxLimine fork BIOS 引导安装到 ISO 完成。")
+    return 0
+
 
 def ensure_disk_image_exists(path=DISK_IMG_PATH, size_mb=64, force=False):
     """确保数据盘存在。force=False 仅缺失时创建；force=True 无条件重建。"""

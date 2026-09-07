@@ -6,8 +6,7 @@ BORUIX SDK 辅助工具统一入口。
     python main.py <子命令> [选项]
 
 子命令:
-    limine   下载并部署 Limine bootloader 到 sdk/boot/
-    build    编译内核并生成可引导 ISO（x86_64）
+    build    编译内核并生成可引导 ISO（x86_64）（Limine 引导完全走 brxLimine fork）
     run      用 QEMU 启动 ISO
     br       Build and Run：编译生成 ISO 后立即用 QEMU 启动
     --help   查看帮助
@@ -18,8 +17,7 @@ BORUIX SDK 辅助工具统一入口。
 import argparse
 import sys
 
-from sdk_build import br, build, disk, limine, limine_build, run
-from sdk_build.config import DEFAULT_LIMINE_VERSION
+from sdk_build import br, build, disk, limine_build, run
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -29,24 +27,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
-    # limine 子命令
-    p_limine = sub.add_parser("limine", help="下载并部署 Limine bootloader")
-    p_limine.add_argument(
-        "--version",
-        default=DEFAULT_LIMINE_VERSION,
-        help=f"Limine 版本（默认 {DEFAULT_LIMINE_VERSION}）",
-    )
-    p_limine.add_argument(
-        "--skip-existing",
-        action="store_true",
-        help="若已存在则跳过下载",
-    )
-    p_limine.add_argument(
-        "--force",
-        action="store_true",
-        help="强制重新下载（删除旧版本）",
-    )
-    p_limine.set_defaults(func=limine.cmd)
 
     # limine-build 子命令：用 i686-elf 交叉编译器编译 Limine BIOS stage2
     p_lb = sub.add_parser("limine-build", help="用 i686-elf 交叉编译器交叉编译 Limine BIOS stage2")
@@ -162,7 +142,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_build.add_argument(
         "--brxlimine",
         action="store_true",
-        help="配合 --systemdisk：用 brxLimine fork（含 EXT2 驱动）引导装系统盘，使系统盘能从 EXT2 分区启动",
+        help="（已废除，恒走 brxLimine fork，保留以兼容旧脚本）",
     )
     p_build.set_defaults(func=build.cmd)
 
