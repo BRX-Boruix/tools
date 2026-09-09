@@ -204,7 +204,7 @@ def _build_userspace() -> int:
     经 include_bytes! 嵌入——无外部盘时系统也能启动（ADR-017）。
     """
     # (源目录, 产物 bin 名)
-    programs = [("init", "init"), ("shell", "shell"), ("volumed", "volumed"), ("synce2e", "synce2e"), ("fpcheck", "fpcheck"), ("spinburn", "spinburn"), ("threaddemo", "threaddemo"), ("userdrv", "userdrv"), ("driverd", "driverd")]
+    programs = [("init", "init"), ("shell", "shell"), ("volumed", "volumed"), ("synce2e", "synce2e"), ("fpcheck", "fpcheck"), ("spinburn", "spinburn"), ("threaddemo", "threaddemo"), ("userdrv", "userdrv"), ("driverd", "driverd"), ("intel-hda", "intel-hda")]
     for src, bin_name in programs:
         dir_ = os.path.join(config.PROJECT_ROOT, src)
         info(f"编译用户程序 ({src} + libsys)")
@@ -276,6 +276,7 @@ def _write_binaries_payload() -> int:
         ("threaddemo.elf", "THREADDEMO_ELF"),
         ("userdrv.elf", "USERDRV_ELF"),
         ("driverd.elf", "DRIVERD_ELF"),
+        ("intel-hda.elf", "INTEL_HDA_ELF"),
         ("chelldemo.elf", "CHELLDEMO_ELF"),
         ("pthreaddemo.elf", "PTHREADDEMO_ELF"),
         ("pthread_syncdemo.elf", "PTHREAD_SYNCDEMO_ELF"),
