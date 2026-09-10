@@ -103,6 +103,9 @@ def _cargo_build_kernel(
     if use_m41:
         features.append("kernel-test-m41")
         info("M4.1：启用 kernel-test-m41 feature（syscall 停机验收，跑完即停）")
+    if os.environ.get("BORUIX_HDA_PROBE") == "1":
+        features.append("hda-probe")
+        info("诊断：启用 hda-probe feature（HDA 设备 DMA 前端探针，随常规测试序列运行）")
     if use_m42:
         features.append("kernel-test-m42")
         info("M4.2：启用 kernel-test-m42 feature（调度器停机验收，跑完即停）")
