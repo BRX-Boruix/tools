@@ -198,6 +198,29 @@ def _make_iso(profile: str = "debug") -> int:
     return 0
 
 
+# 用户程序清单（**单点定义**）。
+#
+# 此前同一份名单在 build.py 里出现两次（一次用于编译、一次用于装进系统盘），
+# 增删程序时必须同时改两处，漏一处就会在运行期表现为「程序莫名不存在」。
+# 收敛为一个常量后，两处消费同一来源（S15 单点定义）。
+#
+# 顺序即 liveCD payload 的排列顺序；列表内容 = 内核 crates/kernel/ 下的 <name>.elf。
+USER_PROGRAMS = (
+    "init",
+    "shell",
+    "volumed",
+    "synce2e",
+    "fpcheck",
+    "spinburn",
+    "threaddemo",
+    "userdrv",
+    "driverd",
+    "intel-hda",
+    "audioe2e",
+    "audiod",
+    "audiofile",
+)
+
 def _build_userspace() -> int:
     """编译用户程序（libsys + init + shell），生成 ELF 供内核 liveCD 内嵌。
 
@@ -207,7 +230,9 @@ def _build_userspace() -> int:
     经 include_bytes! 嵌入——无外部盘时系统也能启动（ADR-017）。
     """
     # (源目录, 产物 bin 名)
-    programs = [("init", "init"), ("shell", "shell"), ("volumed", "volumed"), ("synce2e", "synce2e"), ("fpcheck", "fpcheck"), ("spinburn", "spinburn"), ("threaddemo", "threaddemo"), ("userdrv", "userdrv"), ("driverd", "driverd"), ("intel-hda", "intel-hda"), ("audioe2e", "audioe2e"), ("audiod", "audiod")]
+    # 源目录名与产物名目前一一对应；用同一份 USER_PROGRAMS 派生，
+    # 避免「编译了但没进 payload」这类只在运行期才暴露的漏配。
+    programs = [(name, name) for name in USER_PROGRAMS]
     for src, bin_name in programs:
         dir_ = os.path.join(config.PROJECT_ROOT, src)
         info(f"编译用户程序 ({src} + libsys)")
@@ -348,7 +373,7 @@ def _make_system_disk(profile: str = "debug") -> int:
     with open(kernel_elf, "rb") as f:
         kernel = f.read()
     programs = {}
-    for name in ("init", "shell", "volumed", "synce2e", "fpcheck", "spinburn", "threaddemo", "userdrv", "driverd", "intel-hda", "audioe2e", "audiod"):
+    for name in USER_PROGRAMS:
         elf = os.path.join(config.KERNEL_DIR, "crates", "kernel", name + ".elf")
         if not os.path.isfile(elf):
             err("未找到用户程序 ELF: " + elf)
