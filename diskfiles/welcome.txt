@@ -1,0 +1,7 @@
+Welcome to BORUIX Real Ext2 Filesystem!
+
+This file is not hardcoded in the build script -- it comes from
+  sdk/diskfiles/welcome.txt
+and is written into disk.img at /welcome.txt by `python main.py mkimg`.
+
+Drop any files you like into sdk/diskfiles/ and the disk image will carry them.

@@ -448,8 +448,149 @@ def _write_ext2_filesystem(path, part_start_lba, part_sectors, files, label):
     return True
 
 
-def create_ext2_disk_image(path, size_mb=64, label="BORUIX_DATA"):
-    """创建数据盘：MBR 分区 1 + EXT2，预置 hello.txt / notes.txt。返回 True。"""
+"""
+数据盘内容来源：`sdk/diskfiles/`。
+
+**为何由构建脚本自带内容**：磁盘镜像的内容原本硬编码为两个内联字符串
+（hello.txt / notes.txt），要改内容就得改 Python 源码。改为扫描本目录后，
+内容与代码分离——放文件进去即可，无需动构建逻辑。
+
+**只读语义**：本目录只作为**输入**被读取，构建过程绝不写入它。
+产出物只有 `disk.img`。这保证重复构建的结果只取决于 diskfiles 的内容，
+不受上一次构建影响。
+"""
+
+import os
+
+from . import config
+from .util import err, info
+
+# 镜像内容根目录：与构建脚本同级（sdk/diskfiles）。
+DISKFILES_DIR = os.path.join(config.SDK_DIR, "diskfiles")
+
+# 数据盘容量下限（MB）。小于此值连 EXT2 元数据都紧张，且没有余量做后续写入。
+DISK_MIN_SIZE_MB = 16
+
+# 容量余量：EXT2 元数据、间接块、以及「盘不该被塞满」的预留。
+# 元数据开销随盘增大而增大（块组数 x 每组元数据），故按比例留白而非固定值。
+DISK_META_OVERHEAD_RATIO = 0.25
+# 绝对余量下限（MB）：小盘时比例留白不足以容纳块组元数据。
+DISK_META_OVERHEAD_MIN_MB = 4
+
+
+def scan_diskfiles(src=DISKFILES_DIR):
+    """递归扫描 `src`，返回 `{EXT2 绝对路径: bytes}`（保持目录结构）。
+
+    路径分隔统一为 `/`（`_build_file_tree` 依赖该约定）。相对路径
+    `a/b/c.txt` 映射为 `/a/b/c.txt`。
+
+    目录不存在或为空时**如实报错**，不静默产出一张空盘——
+    一张「成功但没内容」的盘会让调用方以为内容已写入。
+    """
+    if not os.path.isdir(src):
+        err("未找到数据盘内容目录: " + src)
+        err("请创建该目录并放入要写入 disk.img 的文件。")
+        return None
+
+    files = {}
+    for dirpath, dirnames, filenames in os.walk(src):
+        # 排序使构建结果确定：同样的输入必须产出同样的盘（可重复构建）。
+        dirnames.sort()
+        for fn in sorted(filenames):
+            full = os.path.join(dirpath, fn)
+            rel = os.path.relpath(full, src).replace(os.sep, "/")
+            try:
+                with open(full, "rb") as f:
+                    files["/" + rel] = f.read()
+            except OSError as exc:
+                err("读取 " + full + " 失败: " + str(exc))
+                return None
+
+    if not files:
+        err("数据盘内容目录为空: " + src)
+        err("空盘会被误认为「内容已写入」，故此处拒绝构建。")
+        return None
+    return files
+
+
+def compute_disk_size_mb(files):
+    """按内容大小推算镜像容量（MB，整数，向上取整）。
+
+    **为何要算而不是给个固定值**：固定容量在内容超出时会抛
+    「EXT2 块分配超出盘容量」。与其让用户去猜该调多大，不如按实际内容推算。
+
+    估算口径（偏保守，宁可多留不给不够）：
+      1. 文件数据块：每文件按 1KB 块向上取整；
+      2. 间接块：数据块数每满 256 块多占 1 块（单/双/三间接的指针表）；
+      3. inode 表 + 目录块：按文件数 x 每文件 1 块估；
+      4. 再乘 1.25 并加 4MB 下限余量。
+    这些是**上界估计**：多留的余量是刻意的，因为 EXT2 元数据量随盘大小
+    自身增长，精确解需要迭代求解（盘越大、元数据越多、又需要更大）。
+    """
+    block = 1024
+    per_block_ptrs = block // 4
+
+    data_blocks = 0
+    indirect_blocks = 0
+    for data in files.values():
+        n = (len(data) + block - 1) // block
+        data_blocks += n
+        # 间接块数（仅估算用）：每 256 个数据块需要 1 个指针块。
+        indirect_blocks += (n + per_block_ptrs - 1) // per_block_ptrs
+
+    # 每个文件至少 1 个 inode；每个目录至少 1 个数据块。
+    n_files = len(files)
+    dirs = set()
+    for p in files:
+        parts = [x for x in p.split("/") if x]
+        for i in range(1, len(parts)):
+            dirs.add("/".join(parts[:i]))
+    inode_and_dir_blocks = n_files + len(dirs) + 2
+
+    need_bytes = (data_blocks + indirect_blocks + inode_and_dir_blocks) * block
+    need_mb = need_bytes / (1024 * 1024)
+
+    # 元数据开销 + 余量。
+    budget = need_mb * (1 + DISK_META_OVERHEAD_RATIO) + DISK_META_OVERHEAD_MIN_MB
+    size_mb = int(budget + 0.999)  # 向上取整
+    return max(size_mb, DISK_MIN_SIZE_MB)
+
+
+def create_ext2_disk_image(path, size_mb=None, label="BORUIX_DATA", src=None):
+    """创建数据盘：MBR 分区 1 + EXT2，内容取自 `sdk/diskfiles/`。返回 True。
+
+    - `size_mb=None`（默认）：按内容自动推算容量；显式传入则用作覆盖值。
+    - `src`：内容目录，默认 `sdk/diskfiles`（测试可注入临时目录）。
+
+    内容目录**只读**：本函数只读取它，产出物只有 `path`。
+    """
+    if src is None:
+        src = DISKFILES_DIR
+    files = scan_diskfiles(src)
+    if files is None:
+        return False
+
+    if size_mb is None:
+        size_mb = compute_disk_size_mb(files)
+        info(
+            "数据盘容量按内容推算: "
+            + str(size_mb)
+            + "MB ("
+            + str(len(files))
+            + " 个文件)"
+        )
+    else:
+        # 显式覆盖：若内容装不下，如实警告，而不是等往下写时抛异常。
+        need = compute_disk_size_mb(files)
+        if size_mb < need:
+            err(
+                "指定容量 "
+                + str(size_mb)
+                + "MB 小于内容所需约 "
+                + str(need)
+                + "MB，构建可能失败。"
+            )
+
     total_bytes = size_mb * 1024 * 1024
     total_sectors = total_bytes // 512
     info("正在创建磁盘镜像: " + path + " (" + str(size_mb) + "MB, " + str(total_sectors) + " 扇区)...")
@@ -458,9 +599,7 @@ def create_ext2_disk_image(path, size_mb=64, label="BORUIX_DATA"):
         f.seek(total_bytes - 1)
         f.write(b"\x00")
     start, sectors = _pack_mbr(path, total_sectors)
-    hello = b"Welcome to BORUIX Real Ext2 Filesystem!\n"
-    notes = b"System storage initialized with real MBR & EXT2.\n"
-    _write_ext2_filesystem(path, start, sectors, {"/hello.txt": hello, "/notes.txt": notes}, label)
+    _write_ext2_filesystem(path, start, sectors, files, label)
     info("磁盘镜像创建成功: " + path + " (MBR Partition 1 -> EXT2 FS OK)")
     return True
 
@@ -565,8 +704,12 @@ def install_fork_limine_iso(iso_path, fork_cd_bin):
     return 0
 
 
-def ensure_disk_image_exists(path=DISK_IMG_PATH, size_mb=64, force=False):
-    """确保数据盘存在。force=False 仅缺失时创建；force=True 无条件重建。"""
+def ensure_disk_image_exists(path=DISK_IMG_PATH, size_mb=None, force=False):
+    """确保数据盘存在。force=False 仅缺失时创建；force=True 无条件重建。
+
+    `size_mb=None`（默认）表示按 `sdk/diskfiles/` 的内容自动推算容量；
+    这样往 diskfiles 里加文件后重建的盘会自动变大，无需改调用点。
+    """
     if force:
         info("强制重建磁盘镜像: " + path + " (清除旧盘数据)")
         create_ext2_disk_image(path, size_mb=size_mb)
@@ -579,9 +722,12 @@ def ensure_disk_image_exists(path=DISK_IMG_PATH, size_mb=64, force=False):
 
 
 def cmd_mkimg(args):
-    """mkimg 子命令：创建/重格式化数据盘。"""
+    """mkimg 子命令：由 `sdk/diskfiles/` 创建/重格式化数据盘。
+
+    容量默认由内容推算；`--size` 显式给出时作为覆盖值。
+    """
     path = getattr(args, "output", DISK_IMG_PATH)
-    size_mb = getattr(args, "size", 64)
+    size_mb = getattr(args, "size", None)
     label = getattr(args, "label", "BORUIX_DATA")
     force = getattr(args, "force", False)
     if os.path.isfile(path) and not force:
@@ -594,5 +740,7 @@ def cmd_mkimg(args):
             info("操作已取消，保留现有磁盘镜像。")
             return 0
     success = create_ext2_disk_image(path, size_mb=size_mb, label=label)
+    if success:
+        info("内容来源: " + DISKFILES_DIR)
     return 0 if success else 1
 

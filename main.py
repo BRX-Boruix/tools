@@ -316,8 +316,16 @@ def build_parser() -> argparse.ArgumentParser:
     p_br.set_defaults(func=br.cmd)
 
     # mkimg 子命令：创建/格式化物理磁盘镜像
-    p_mkimg = sub.add_parser("mkimg", help="创建或重新格式化物理磁盘镜像 (EXT2)")
-    p_mkimg.add_argument("--size", type=int, default=64, help="磁盘大小 (MB，默认 64)")
+    p_mkimg = sub.add_parser(
+        "mkimg",
+        help="由 sdk/diskfiles/ 创建或重新格式化数据盘镜像 (EXT2)",
+    )
+    p_mkimg.add_argument(
+        "--size",
+        type=int,
+        default=None,
+        help="磁盘大小 (MB)。默认按 diskfiles 内容自动推算；显式给出则作为覆盖值",
+    )
     p_mkimg.add_argument("--label", default="BORUIX_DATA", help="EXT2 卷标名 (默认 BORUIX_DATA)")
     p_mkimg.add_argument("--force", "-f", action="store_true", help="强制覆盖已有磁盘镜像无需确认")
     p_mkimg.set_defaults(func=disk.cmd_mkimg)

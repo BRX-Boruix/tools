@@ -1,0 +1,5 @@
+BORUIX data disk demo
+=====================
+
+nested directory contents are preserved.
+Size of this file matters: the image grows with the total content.
