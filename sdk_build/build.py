@@ -294,24 +294,22 @@ def _write_binaries_payload() -> int:
     """
     kernel_crate = os.path.join(config.KERNEL_DIR, "crates", "kernel")
     src_dir = os.path.join(kernel_crate, "src")
-    payloads = [
-        ("init.elf", "INIT_ELF"),
-        ("shell.elf", "SHELL_ELF"),
-        ("volumed.elf", "VOLUMED_ELF"),
-        ("synce2e.elf", "SYNCE2E_ELF"),
-        ("fpcheck.elf", "FPCHECK_ELF"),
-        ("spinburn.elf", "SPINBURN_ELF"),
-        ("threaddemo.elf", "THREADDEMO_ELF"),
-        ("userdrv.elf", "USERDRV_ELF"),
-        ("driverd.elf", "DRIVERD_ELF"),
-        ("intel-hda.elf", "INTEL_HDA_ELF"),
-        ("chelldemo.elf", "CHELLDEMO_ELF"),
-        ("pthreaddemo.elf", "PTHREADDEMO_ELF"),
-        ("pthread_syncdemo.elf", "PTHREAD_SYNCDEMO_ELF"),
-        ("pthread_bench.elf", "PTHREAD_BENCH_ELF"),
-        ("audioe2e.elf", "AUDIOE2E_ELF"),
-        ("audiod.elf", "AUDIOD_ELF"),
+    # 由 USER_PROGRAMS 派生，避免第三份手工名单与 build 名单漂移。
+    #
+    # **此前这里是一份独立的硬编码清单**：往 USER_PROGRAMS 里加程序后，
+    # 此处不改就会「编译了、复制了，但没进 liveCD payload」，
+    # 表现为 liveCD 下 `programs/<name>.elf` ENOENT（实测踩到）。
+    #
+    # 少数不在 USER_PROGRAMS 里的程序（测试/演示用途，源目录名与产物名不同）
+    # 单独列出。
+    extra = [
+        ("chelldemo", "CHELLDEMO_ELF"),
+        ("pthreaddemo", "PTHREADDEMO_ELF"),
+        ("pthread_syncdemo", "PTHREAD_SYNCDEMO_ELF"),
+        ("pthread_bench", "PTHREAD_BENCH_ELF"),
     ]
+    payloads = [(f"{n}.elf", f"{n.upper().replace('-', '_')}_ELF") for n in USER_PROGRAMS]
+    payloads += [(f"{n}.elf", ident) for n, ident in extra]
     missing = [
         n for n, _ in payloads if not os.path.isfile(os.path.join(kernel_crate, n))
     ]
