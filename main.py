@@ -150,6 +150,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_run = sub.add_parser("run", help="用 QEMU 启动 ISO")
     p_run.add_argument("--mem", default="128M", help="内存大小（默认 128M）")
     p_run.add_argument("--serial", action="store_true", help="启用串口输出到终端")
+    p_run.add_argument(
+        "--silent",
+        action="store_true",
+        help="音频改为落盘到 audio-out.wav 而不是本机喇叭（无声卡环境/留档用）",
+    )
     # 盘策略三选一：默认即 LiveCD（不挂盘）；--disk 挂现有盘（缺失自动建）；
     # --redisk 重建盘再挂。均为互斥，绝不静默覆盖盘数据。
     p_run_disk_grp = p_run.add_mutually_exclusive_group()
@@ -275,6 +280,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_br.add_argument("--mem", default="128M", help="内存大小（默认 128M）")
     p_br.add_argument("--serial", action="store_true", help="启用串口输出到终端")
+    p_br.add_argument(
+        "--silent",
+        action="store_true",
+        help="音频改为落盘到 audio-out.wav 而不是本机喇叭（无声卡环境/留档用）",
+    )
     # 盘策略三选一（同 run）：默认即 LiveCD；--disk 挂盘；--redisk 重建盘再挂。
     p_br_disk_grp = p_br.add_mutually_exclusive_group()
     p_br_disk_grp.add_argument(

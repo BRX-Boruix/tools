@@ -42,6 +42,7 @@ def cmd(args: argparse.Namespace) -> int:
     #   默认 / `--nodisk`  → 不挂数据盘（纯 liveCD 或纯系统盘）
     #   `--disk`           → 挂现有数据盘（缺失则自动创建）
     #   `--redisk`         → 无条件重建数据盘再挂（清旧盘数据，用当前构建产物）
+    silent = getattr(args, "silent", False)
     nodisk = getattr(args, "nodisk", False)
     redisk = getattr(args, "redisk", False)
     with_disk = getattr(args, "disk", False)
@@ -66,7 +67,7 @@ def cmd(args: argparse.Namespace) -> int:
         cmd += ["-boot", "order=c", "-m", str(args.mem),
                 "-netdev", "user,id=net0", "-device", "e1000,netdev=net0"]
         cmd += smp_args
-        cmd += config.sound_card_args()
+        cmd += config.sound_card_args(silent=silent)
     else:
         # ISO 启动（默认/liveCD）：
         if not os.path.isfile(config.OUTPUT_ISO):
@@ -80,15 +81,14 @@ def cmd(args: argparse.Namespace) -> int:
         cmd += ["-boot", "order=d", "-m", str(args.mem),
                 "-netdev", "user,id=net0", "-device", "e1000,netdev=net0"]
         cmd += smp_args
-        cmd += config.sound_card_args()
+        cmd += config.sound_card_args(silent=silent)
     if args.serial:
         cmd += ["-serial", "stdio"]
     extra = (" + 数据盘 " + os.path.basename(disk_path)) if disk_mode in ("disk", "redisk") else ""
     info("盘策略: " + disk_mode + extra)
     smp_desc = ("SMP " + str(smp_n) + " 核") if smp_n is not None else "单核 (no SMP)"
     info("CPU 拓扑: " + smp_desc)
-    info("声卡: " + config.SOUND_CARD_CONTROLLER + " + " + config.SOUND_CARD_OUTPUT
-         + " -> " + os.path.basename(config.OUTPUT_WAV))
+    info("声卡: " + config.audiodev_desc(silent=silent))
     info("启动 QEMU: " + os.path.basename(qemu) + " (boot=" + ("c" if systemdisk else "d") + ")")
     return subprocess.run(cmd).returncode
 

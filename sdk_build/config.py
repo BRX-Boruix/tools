@@ -24,27 +24,44 @@ OUTPUT_ISO = os.path.join(PROJECT_ROOT, "boruix.iso")
 # 两者缺一不可：没有 `intel-hda` 就没有控制器，没有 `hda-output` 就没有 codec，
 # 驱动探测不到设备就不会注册 `/devices/audio/dsp`，`audiofile` 也无从播放。
 #
-# 音频落盘成 WAV 而不接宿主声卡：一是无音频设备的环境（CI）也能跑，
-# 二是产物可事后比对——「真的录下了什么」比「我听见了」可验证。
+# `-audiodev` 决定声卡的输出端接到哪里，即「喇叭是谁」：
+#   dsound -> 宿主 Windows 的本机喇叭（默认，用于真的听声音）
+#   wav    -> 落盘成文件（`--silent`，用于无声卡环境/留档比对）
+# 硬件侧（寄存器、DMA 环、codec 配置）与选哪个无关，两条路走的是同一套代码。
 SOUND_CARD_CONTROLLER = "intel-hda"
 SOUND_CARD_OUTPUT = "hda-output"
 AUDIODEV_ID = "snd0"
+# 宿主音频后端：dsound = 本机喇叭。
+HOST_AUDIODEV = "dsound"
+# --silent 时的落盘路径。
 OUTPUT_WAV = os.path.join(PROJECT_ROOT, "audio-out.wav")
 
 
-def sound_card_args(path=None):
+def sound_card_args(silent=False, path=None):
     """声卡相关 QEMU 参数：audiodev + intel-hda 控制器 + hda-output。
+
+    默认把声音送到**宿主本机喇叭**（dsound）。`silent=True` 时改为落盘成 WAV，
+    供没有音频设备的机器（CI）或需要事后留档的场合使用。
 
     单点定义（S15）：起机器的所有路径都从这里取，避免各子命令各写一份、
     改一处漏一处（本项目已在用户程序清单上吃过三份副本的亏）。
-    `path` 为 WAV 落盘路径，默认 OUTPUT_WAV。
     """
-    wav = path or OUTPUT_WAV
+    if silent:
+        audiodev = "wav,id=%s,path=%s" % (AUDIODEV_ID, path or OUTPUT_WAV)
+    else:
+        audiodev = "%s,id=%s" % (HOST_AUDIODEV, AUDIODEV_ID)
     return [
-        "-audiodev", "wav,id=%s,path=%s" % (AUDIODEV_ID, wav),
+        "-audiodev", audiodev,
         "-device", SOUND_CARD_CONTROLLER,
         "-device", "%s,audiodev=%s" % (SOUND_CARD_OUTPUT, AUDIODEV_ID),
     ]
+
+
+def audiodev_desc(silent=False):
+    """声卡输出端的一句话描述（打印用，避免日志与实际参数不符）。"""
+    if silent:
+        return "intel-hda + hda-output -> %s" % os.path.basename(OUTPUT_WAV)
+    return "intel-hda + hda-output -> 本机喇叭 (%s)" % HOST_AUDIODEV
 
 # 项目 envfiles 目录（工具链等外部依赖的解压产物）
 ENVFILES_DIR = os.path.join(PROJECT_ROOT, "envfiles")
