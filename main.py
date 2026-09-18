@@ -174,6 +174,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="显式声明纯 LiveCD 启动（默认即此，仅供消除歧义）",
     )
     p_run.add_argument(
+        "--ahci",
+        action="store_true",
+        help="把盘挂到显式插入的 ich9-ahci 控制器（而非默认 PIIX4 IDE），"
+        "供 AHCI 驱动验收；默认关闭，现有链路行为不变",
+    )
+    p_run.add_argument(
         "--systemdisk",
         action="store_true",
         help="从 build 产出的系统盘 systemdisk.img 启动（-hda；可与 --disk/--redisk 并存，系统盘 -hda + 数据盘 -hdb）",
@@ -301,6 +307,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--nodisk",
         action="store_true",
         help="显式声明纯 LiveCD 启动（默认即此，仅供消除歧义）",
+    )
+    p_br.add_argument(
+        "--ahci",
+        action="store_true",
+        help="把盘挂到显式插入的 ich9-ahci 控制器（而非默认 PIIX4 IDE），"
+        "供 AHCI 驱动验收；默认关闭，现有链路行为不变",
     )
     p_br.add_argument(
         "--systemdisk",

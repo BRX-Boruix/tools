@@ -24,6 +24,67 @@ def _find_qemu() -> str:
     return ""
 
 
+def _ahci_controller_args():
+    """AHCI 控制器设备参数（STORAGE-AHCI-2a）。
+
+    QEMU 默认 pc 机器是 i440FX + PIIX4（IDE only），-hda 挂的盘属于 PIIX4
+    控制器，AHCI 驱动**看不到**它。故走 AHCI 时必须显式插入 ich9-ahci
+    控制器，并把盘挂到它的 ahci.N 总线上。
+
+    为什么用 ich9-ahci 而非切 q35 机器：切机器会改动全部现有启动/存储链路的
+    默认行为，回归面过大且与补 AHCI 这件事无关。显式插控制器是能力增量，
+    默认路径一字不改。
+    """
+    return ["-device", "ich9-ahci,id=ahci"]
+
+
+def _disk_args(buses):
+    """按 buses 把盘挂到对应总线（单点定义，杜绝 IDE/AHCI 两路漂移）。
+
+    buses 是 (盘文件路径, 总线后缀) 的有序列表：
+      - 后缀 ""         -> 走默认 IDE 控制器（等价既有 -hda/-hdb 位置语义）
+      - 后缀 "ahci.N"   -> 独立 drive 后端 + 显式挂到 AHCI 总线 N
+
+    抽出为单函数是为了杜绝漂移：两条路径的差异只在挂到哪条总线，
+    盘的存在性与顺序必须完全一致，否则易出 AHCI 下漏挂数据盘这类
+    只在特定参数组合下暴露的缺陷。
+    """
+    ide_flags = ["-hda", "-hdb", "-hdc", "-hdd"]
+    out = []
+    for idx, item in enumerate(buses):
+        path, bus = item
+        if bus:
+            dev_id = "hd" + str(idx)
+            out += ["-drive", "if=none,id=" + dev_id + ",file=" + path + ",format=raw"]
+            out += ["-device", "ide-hd,drive=" + dev_id + ",bus=" + bus]
+        else:
+            # IDE 位置语义与既有一致，保证默认路径零回归。
+            out += [ide_flags[idx], path]
+    return out
+
+
+def _disk_topology(args, disk_mode, disk_path, sys_disk):
+    """裁决挂哪些盘与各挂到哪条总线，产出完整 QEMU 盘参数。
+
+    控制器选择（IDE vs AHCI）与挂哪些盘正交，统一在此裁决，
+    避免在每个分支重复写盘参数。
+    """
+    ahci = bool(getattr(args, "ahci", False))
+    systemdisk = bool(getattr(args, "systemdisk", False))
+    with_disk = disk_mode in ("disk", "redisk")
+
+    # 盘序列：系统盘在前（与既有系统盘 -hda 语义一致），数据盘在后。
+    planned = []
+    if systemdisk:
+        planned.append(sys_disk)
+    if with_disk:
+        planned.append(disk_path)
+
+    if ahci:
+        buses = [(p, "ahci." + str(i)) for i, p in enumerate(planned)]
+    else:
+        buses = [(p, "") for p in planned]
+    return _disk_args(buses)
 def cmd(args: argparse.Namespace) -> int:
     """用 QEMU 启动 ISO（默认）或系统盘（--systemdisk）。
 
@@ -53,6 +114,7 @@ def cmd(args: argparse.Namespace) -> int:
     smp_n = getattr(args, "smp", 4)
     smp_args = ["-cpu", "max", "-smp", str(smp_n)] if smp_n is not None else []
 
+    ahci = bool(getattr(args, "ahci", False))
     if systemdisk:
         # 系统盘启动：不依赖 ISO（build --systemdisk 产物即系统盘）。
         sys_disk = disk.SYSTEM_DISK_IMG_PATH
@@ -61,27 +123,32 @@ def cmd(args: argparse.Namespace) -> int:
             return 1
         if disk_mode in ("disk", "redisk"):
             disk.ensure_disk_image_exists(disk_path, force=(disk_mode == "redisk"))
-        cmd = [qemu, "-hda", sys_disk]
-        if disk_mode in ("disk", "redisk"):
-            cmd += ["-hdb", disk_path]
-        cmd += ["-boot", "order=c", "-m", str(args.mem),
-                "-netdev", "user,id=net0", "-device", "e1000,netdev=net0"]
-        cmd += smp_args
-        cmd += config.sound_card_args(silent=silent)
+        boot_order = "c"
     else:
         # ISO 启动（默认/liveCD）：
+        sys_disk = ""
         if not os.path.isfile(config.OUTPUT_ISO):
             err("未找到 ISO: " + config.OUTPUT_ISO + "，请先运行 build")
             return 1
         if disk_mode in ("disk", "redisk"):
             disk.ensure_disk_image_exists(disk_path, force=(disk_mode == "redisk"))
+        boot_order = "d"
+
+    # 盘挂载：控制器（IDE/AHCI）与"挂哪些盘"在此统一裁决（单点定义）。
+    disk_args = _disk_topology(args, disk_mode, disk_path, sys_disk)
+
+    # 顺序关键：QEMU 按序解析设备，AHCI 控制器须在引用其总线的盘**之前**出现。
+    if systemdisk:
+        cmd = [qemu]
+    else:
         cmd = [qemu, "-cdrom", config.OUTPUT_ISO]
-        if disk_mode in ("disk", "redisk"):
-            cmd += ["-hda", disk_path]
-        cmd += ["-boot", "order=d", "-m", str(args.mem),
-                "-netdev", "user,id=net0", "-device", "e1000,netdev=net0"]
-        cmd += smp_args
-        cmd += config.sound_card_args(silent=silent)
+    if ahci:
+        cmd += _ahci_controller_args()
+    cmd += disk_args
+    cmd += ["-boot", "order=" + boot_order, "-m", str(args.mem),
+            "-netdev", "user,id=net0", "-device", "e1000,netdev=net0"]
+    cmd += smp_args
+    cmd += config.sound_card_args(silent=silent)
     if args.serial:
         cmd += ["-serial", "stdio"]
     extra = (" + 数据盘 " + os.path.basename(disk_path)) if disk_mode in ("disk", "redisk") else ""
@@ -89,6 +156,7 @@ def cmd(args: argparse.Namespace) -> int:
     smp_desc = ("SMP " + str(smp_n) + " 核") if smp_n is not None else "单核 (no SMP)"
     info("CPU 拓扑: " + smp_desc)
     info("声卡: " + config.audiodev_desc(silent=silent))
+    info("存储控制器: " + ("AHCI (ich9-ahci, 显式)" if ahci else "PIIX4 IDE (默认)"))
     info("启动 QEMU: " + os.path.basename(qemu) + " (boot=" + ("c" if systemdisk else "d") + ")")
     return subprocess.run(cmd).returncode
 
