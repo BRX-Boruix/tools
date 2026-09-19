@@ -219,6 +219,7 @@ USER_PROGRAMS = (
     "audioe2e",
     "audiod",
     "audiofile",
+    "selftest",
 )
 
 def _build_userspace() -> int:
@@ -262,6 +263,8 @@ def _build_userspace() -> int:
         ("pthreaddemo", "prog", ["thread.c", "pthread.c"]),
         ("pthread_syncdemo", "prog", ["thread.c", "pthread.c", "pthread_sync.c"]),
         ("pthread_bench", "prog", ["thread.c", "pthread.c", "pthread_sync.c", "stdio.c"]),
+        # ADR-038 U1/D5：真实 C 用户态 fork()+waitpid() 端到端验收（零 Rust libc）。
+        ("forkdemo", "prog", []),
     ]
     c_build_dir = os.path.join(config.PROJECT_ROOT, "csrc", "_build")
     for cprog in c_progs:
@@ -307,6 +310,7 @@ def _write_binaries_payload() -> int:
         ("pthreaddemo", "PTHREADDEMO_ELF"),
         ("pthread_syncdemo", "PTHREAD_SYNCDEMO_ELF"),
         ("pthread_bench", "PTHREAD_BENCH_ELF"),
+        ("forkdemo", "FORKDEMO_ELF"),
     ]
     payloads = [(f"{n}.elf", f"{n.upper().replace('-', '_')}_ELF") for n in USER_PROGRAMS]
     payloads += [(f"{n}.elf", ident) for n, ident in extra]
