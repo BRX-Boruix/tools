@@ -212,6 +212,7 @@ USER_PROGRAMS = (
     "synce2e",
     "acee2e",
     "trave2e",
+    "pwde2e",
     "fpcheck",
     "spinburn",
     "threaddemo",
@@ -246,7 +247,14 @@ def _build_userspace() -> int:
             "--target", config.TARGET,
             "--release",
         ]
-        r = subprocess.run(cmd, cwd=config.PROJECT_ROOT)
+        # init 的构建期开关（见 init/build.rs）：内核以空 argv spawn init，
+        # 且本仓无 kernel cmdline，故 init 的运行期开关只能靠**构建期**注入。
+        # 这里让 init 释放后仍进入交互 shell（**不**自动跑 selftest）——自动化验收
+        # 另用 `BORUIX_INIT_ARGS` 环境变量覆盖，正常构建行为完全不变。
+        env = dict(os.environ)
+        if src == "init":
+            env.setdefault("BORUIX_INIT_ARGS", "")
+        r = subprocess.run(cmd, cwd=config.PROJECT_ROOT, env=env)
         if r.returncode != 0:
             err(f"用户程序 {src} 编译失败")
             return r.returncode
