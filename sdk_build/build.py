@@ -210,6 +210,7 @@ USER_PROGRAMS = (
     "shell",
     "volumed",
     "synce2e",
+    "acee2e",
     "fpcheck",
     "spinburn",
     "threaddemo",
