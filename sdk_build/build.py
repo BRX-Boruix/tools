@@ -211,6 +211,7 @@ USER_PROGRAMS = (
     "volumed",
     "synce2e",
     "acee2e",
+    "trave2e",
     "fpcheck",
     "spinburn",
     "threaddemo",
