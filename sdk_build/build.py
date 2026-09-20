@@ -215,6 +215,7 @@ USER_PROGRAMS = (
     "threaddemo",
     "userdrv",
     "driverd",
+    "userd",
     "intel-hda",
     "audioe2e",
     "audiod",
