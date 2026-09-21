@@ -16,3 +16,6 @@ __pycache__/
 # 归档的 aarch64 固件（二进制，不提交；README 和脚本保留）
 /archived/aarch64/firmware/
 
+
+# 大体积音频测试素材（45MB wav，本地测试用，不提交；小体积 tone-*.wav 已入库）
+/diskfiles/nggyumix.wav
