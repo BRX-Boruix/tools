@@ -213,6 +213,7 @@ USER_PROGRAMS = (
     "acee2e",
     "trave2e",
     "pwde2e",
+    "login",
     "fpcheck",
     "spinburn",
     "threaddemo",
