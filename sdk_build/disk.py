@@ -327,7 +327,16 @@ def _write_ext2_filesystem(path, part_start_lba, part_sectors, files, label):
             _, data, size = payload
             i_block, sectors = _alloc_file_blocks(alloc, size)
             file_data[ino] = (i_block, data)
-            inode_meta[ino] = (EXT2_S_IFREG | 0o644, size, i_block, sectors)
+            # 文件权限：全部 0755（可执行）。此前统一 0644，使 /programs 池里的程序 ELF
+            # **没有 x 位**——liveCD 启动时 /programs 来自内核内嵌 payload（不走 DAC），
+            # 问题被掩盖；系统盘（ADR-029 安装模式）启动时 /programs 即本盘 EXT2 池目录，
+            # exec 走真实策略求值，A2-7 起 init 在拉起 login 前已把 caps 收窄为
+            # SYSTEM|KILL（不再持 CAP_OWNER 绕过面），对无 x 位文件的 exec 被如实拒绝
+            # （EACCES），用户可见症状为「login.elf/shell.elf 无法启动，进不去系统」。
+            # 本函数的两个使用方（系统盘 /boot/* + /programs/*、数据盘文档）中，引导
+            # 文件与程序本就需要可读可执行，统一 0755 无害；数据盘文档变 0755 亦不
+            # 构成安全问题（数据盘无认证边界，见 ADR-041 §1.2.5 R-1 的同源论证）。
+            inode_meta[ino] = (EXT2_S_IFREG | 0o755, size, i_block, sectors)
     walk(assigned, 2)
 
     # 位图必须覆盖 allocator 分发的每一块（含目录/数据/间接块）+ 全部元数据块。
