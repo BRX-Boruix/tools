@@ -30,7 +30,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 QEMU = os.path.join(ROOT, "envfiles", "tools", "qemu-stable",
                     "qemu-9.2.0-win64", "qemu-system-x86_64.exe")
 PORT = int(os.environ.get("L4_MON_PORT", "45520"))
-BOOT_WAIT = int(os.environ.get("L4_BOOT_WAIT", "88"))
+BOOT_WAIT = int(os.environ.get("L4_BOOT_WAIT", "300"))
 
 
 def main():
@@ -94,8 +94,13 @@ def main():
         checks.append((name, bool(cond)))
         print("  [%s] %s %s" % ("PASS" if cond else "FAIL", name, detail))
 
-    print("[l4] waiting %ds for boot ..." % BOOT_WAIT)
-    time.sleep(BOOT_WAIT)
+    # 等到真的出现登录提示符，而不是固定秒数（§6.10）。
+    # selftest.py 会把 boruix.iso 换成自检镜像（开机跑约 300s 自检、永远不进 login），
+    # 固定秒数会让键敲进自检输出里——症状像「代码坏了」，实为测试环境被上一步改坏了。
+    print("[l4] waiting up to %ds for the login prompt ..." % BOOT_WAIT)
+    _deadline = time.time() + BOOT_WAIT
+    while "username:" not in snap() and time.time() < _deadline:
+        time.sleep(1.0)
 
     # --- 登录（L-3 已验证的路径） ---
     deadline = time.time() + 30.0
