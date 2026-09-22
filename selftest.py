@@ -185,6 +185,32 @@ def main() -> int:
             print(f"    {e}")
 
     # 判定
+    #
+    # rc 语义：0 = QEMU 自行退出；124 = 运行超时被强制终止；其它 = 异常退出。
+    #
+    # **约定（本仓库既有传统，多处已成文）**：自检跑完后内核不退出而是常驻空转，
+    # 因此 **“收敛后 rc=124” 是正常终态**（drv1.md / loader1.md / klib1.md 均已登记）。
+    #
+    # 但 **“半途 rc=124” 是真失败**：内核挂死时既无 PANIC 也无 EXCEPTION，
+    # 此前判定只看那三个字符串，于是挂死被静默算作“通过”——那是伪绿（S09/S10）。
+    #
+    # 区分依据：收敛的套件会跑到最后一个测试块（序列末位是 test-fast4，
+    # sdk/selftest.py 侧无法知道内核实际测试总数）。故用“是否触及序列尾部”作为
+    # 软信号：未触及尾部且 rc=124 → 半途截断，判失败并如实报告。
+    if rc == 124:
+        tail_markers = ("test-fast4", "test-drv1", "test-loader", "test-vfs-m65")
+        reached_tail = any(m in res["text"] for m in tail_markers)
+        if not reached_tail:
+            err(
+                f"判定：测试失败（QEMU 超时 {args.timeout}s 且未触及序列尾部——"
+                "套件半途截断，内核可能挂死或预算不足）"
+            )
+            return 1
+        info("判定：套件已收敛至尾部，rc=124 属既有常驻空转终态（非失败）")
+    elif rc != 0:
+        err(f"判定：测试失败（QEMU 异常退出码 {rc}）")
+        return 1
+
     failed = bool(res["panics"] or res["assert_fails"] or res["cpu_exceptions"])
     if failed:
         err("判定：测试失败（存在 PANIC / assert 失败 / CPU EXCEPTION）")
