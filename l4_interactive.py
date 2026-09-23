@@ -181,6 +181,16 @@ def main():
           "(shell did not run the follow-up command)")
 
     print("[l4] serial bytes: %d" % len(final))
+    # 诊断增强：把完整串口落盘（此前只有脚本自身的 [l4] 行，
+    # 真出问题时无法回看内核/用户态到底输出了什么）。环境变量
+    # L4_DUMP 指定路径；未设则默认写到当前目录 l4_serial.txt。
+    dump_path = os.environ.get("L4_DUMP", "l4_serial.txt")
+    try:
+        with open(dump_path, "wb") as f:
+            f.write(final.encode("utf-8", "replace"))
+        print("[l4] serial dumped to %s" % dump_path)
+    except OSError as e:
+        print("[l4] WARN cannot dump serial: %s" % e)
     failed = [c for c in checks if not c[1]]
     print("[l4] ---- %d/%d checks passed ----" % (len(checks) - len(failed),
                                                    len(checks)))
