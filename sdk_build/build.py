@@ -215,6 +215,7 @@ USER_PROGRAMS = (
     "pwde2e",
     "login",
     "fpcheck",
+    "tokendemo",
     "spinburn",
     "threaddemo",
     "userdrv",
