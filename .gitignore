@@ -19,3 +19,13 @@ __pycache__/
 
 # 大体积音频测试素材（45MB wav，本地测试用，不提交；小体积 tone-*.wav 已入库）
 /diskfiles/nggyumix.wav
+
+# 交互验收脚本的串口抓取与临时产物（本地诊断用，不提交）
+l*_serial.txt
+_l*_serial.log
+_selftest_qemu.log
+ctrl_c_run_*.txt
+yield_run_*.txt
+_p*.txt
+_p*.py
+_l4neg.py
