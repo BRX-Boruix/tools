@@ -59,9 +59,22 @@ def main():
         f.flush()
         time.sleep(d)
 
+    # QEMU `sendkey` 只接受 **QKeyCode** 名，**不接受大写字母**：
+    # 实测 `sendkey A` -> `invalid parameter: A`，且**不报错到串口**——
+    # 若把大写原样传出，注入会**静默变成空操作**，测试随之失去判别力。
+    # 故此处显式映射：大写 -> `shift-<小写>`（与人手按 Shift 同链路）。
+    _SPECIAL = {" ": "spc", "|": "backslash"}
+
+    def _qc(ch):
+        if ch in _SPECIAL:
+            return _SPECIAL[ch]
+        if ch.isupper():
+            return "shift-" + ch.lower()
+        return ch
+
     def type_str(txt, d=0.14):
         for ch in txt:
-            key({" ": "spc", "|": "backslash"}.get(ch, ch), d)
+            key(_qc(ch), d)
 
     def snap():
         try:
@@ -125,16 +138,32 @@ def main():
     marks["s3"] = snap()
 
     # ---- 场景 4：退格 ----
-    print("[l2] scenario 4: 'echoZ' + Backspace + 'X' + Enter")
-    type_str("echoZ")
+    # 【2026-09-25 修正】原写 `type_str("echoZ")` 而 `type_str` 把大写原样交给
+    # `sendkey`——**QEMU 拒绝大写键名**（`invalid parameter: Z`）且不报错到串口，
+    # 故 `Z` **从未上屏**；于是断言的 `"echoZ" not in s4` 成了**恒真**断言：
+    # 即使退格完全失效也照样通过（与 §6.10.1 的「恒假断言」同类，方向相反）。
+    # 实测证据：串口只有 `echo` -> `ech` -> `echend`，全程无 `Z`。
+    # 现改为 `shift-z` 打出**真正的 Z**，并**分两步**断言，使判据具备判别力：
+    #   (1) Z 确实上屏（证明注入成功，判据非空转）
+    #   (2) 退格后 Z 消失（证明退格生效）
+    print("[l2] scenario 4: 'echo' + Shift+Z + Backspace + 'end' + Enter")
+    type_str("echo")
+    key("shift-z")          # 真 Z（经 Shift 状态机，与手按同链路）
+    time.sleep(0.5)
+    marks["s4_before"] = snap()
     key("backspace")
     time.sleep(0.5)
+    # **退格后的回显增量**：`snap()` 返回的是**整份**串口日志，
+    # 而 `echoZ` 那一行仍留在前面的重绘历史里，故不能用「整份日志不含 echoZ」
+    # 作判据（那会永远为假）。改看**退格之后新产生的那一段**：
+    # 若退格生效，末行应回到 `echo`（Z 被抹掉）。
+    marks["s4_after_backspace"] = snap()[len(marks["s4_before"]):]
     # 退格后再输一个可观察字符：若退格生效，Z 应消失。
     # （不断言精确长度——monitor 的 sendkey 可能自动重复，那是注入工具的行为，不是 shell 的。）
     type_str("end")
     key("ret")
     time.sleep(2.5)
-    marks["s4"] = snap()
+    marks["s4"] = snap()[len(marks["s4_before"]):]
 
     proc.kill()
     try:
@@ -181,9 +210,20 @@ def main():
     check("s3_tab_completed", "echo tabtest" in s3,
           "(no literal 'echo tabtest' -> Tab did not expand 'ec')")
 
-    # 场景 4：退格删掉 Z，故是 'echo ok' 而非 'echoZ ok'
-    # 退格后缓冲区应为 'echo'，故执行的是 echo。关键证据：Z 不在最终命令里。
-    check("s4_backspace_removed_Z", "echoZ" not in s4, "(stray Z still present -> backspace broken)")
+    # 场景 4：退格删掉 Z。
+    # 判据必须**两步**，否则会退化成恒真断言（见上方 2026-09-25 修正说明）：
+    #   s4a 证明 Z **确实上屏过**（否则后半段判据无判别力）；
+    #   s4b 证明退格后 Z **消失**（这才是退格生效的证据）。
+    s4_before = marks.get("s4_before", "")
+    s4_after = marks.get("s4_after_backspace", "")
+    check("s4_shift_z_typed", "echoZ" in s4_before,
+          "(Shift+Z never appeared -> the injection failed, so the backspace check below is vacuous)")
+    # 判据：退格**之后**的增量里，末次重绘已不含 Z（即回到 `echo`）。
+    # 分两步的必要性：第一步保证 Z 真上屏，第二步才有判别力。
+    _after_lines = [l for l in s4_after.splitlines() if l.strip()]
+    _last = _after_lines[-1] if _after_lines else ""
+    check("s4_backspace_removed_Z", "echoZ" not in s4_after and "echo" in _last,
+          "(last redraw=%r -> backspace did not erase Z)" % _last[-30:])
 
     failed = [c for c in checks if not c[1]]
     print("[l2] ---- %d/%d checks passed ----" % (len(checks) - len(failed), len(checks)))
