@@ -217,6 +217,10 @@ USER_PROGRAMS = (
     "fpcheck",
     "tokendemo",
     "spinburn",
+    # `yielder`：纯忙-yield 压测进程（不 sleep、不阻塞），用于判定实验——
+    # 验证「唯一就绪进程 busy-yield」是否会饿死其它进程。
+    # 见 docs/TODO/terminal-input.md 6.12.8。
+    "yielder",
     "threaddemo",
     "userdrv",
     "driverd",
