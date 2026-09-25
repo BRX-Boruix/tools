@@ -226,6 +226,10 @@ USER_PROGRAMS = (
     # 证明「事件流可被用户态消费、产出正确字节，且空读在内核阻塞而非自旋」。
     # 见 docs/TODO/terminal-input.md §6.13。
     "evdemo",
+    # `blkdemo`：**诊断对照**——前台阻塞在 stdin（旧字节路径）。
+    # 与 `evdemo` 的唯一差别是等待源（`KBD_WAITER` vs `IN_EVENT_WAITER`），
+    # 用来判定 §6.13 的 CPU 缺陷归属。见 docs/TODO/terminal-input.md §6.13。
+    "blkdemo",
     "threaddemo",
     "userdrv",
     "driverd",

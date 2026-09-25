@@ -44,3 +44,9 @@ _stat_serial.txt
 _clean_serial.txt
 _sym.py
 _dis.py
+_diag_serial.txt
+_diag2_serial.txt
+_cat_serial.txt
+_samp_serial.txt
+_iso_*.txt
+_own_*.txt
