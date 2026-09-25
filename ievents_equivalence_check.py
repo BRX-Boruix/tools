@@ -39,10 +39,22 @@ QEMU = os.path.join(ROOT, "envfiles", "tools", "qemu-stable", "qemu-9.2.0-win64"
 def qk(ch):
     if ch == " ": return "spc"
     if ch == "\n": return "ret"
+    if ch == "\x7f": return "backspace"
+    if ch == "!": return "shift-1"
+    if ch == "@": return "shift-2"
     if ch.isupper(): return "shift-" + ch.lower()
     return ch
 
-KEYS = ["a", "Z", "7", " ", "\n"]
+# 按键序列设计（覆盖两路最易分歧的类别）:
+#   a      小写
+#   Z      Shift 大写（修饰键状态机）
+#   7      数字
+#   !      Shift+数字（符号表 KEYMAP_SHIFT[0x02]）
+#   BS     退格（0x7F，会**修改**缓冲区）
+#   空格   词边界
+#   RET    提交
+# 期望: 退格删掉 '!', 故最终命令行为 "aZ7 " （路径B 的 token 序列含 [BS]）。
+KEYS = ["a", "Z", "7", "!", "\x7f", " ", "\n"]
 
 def run_byte_path():
     """路径A: shell 从 fd0 读字节并回显 -> 取回显的最终命令行."""
@@ -145,16 +157,35 @@ b = run_event_path()
 print("路径B 事件路径(libsys keymap) tokens: %r" % b)
 print("")
 # 判据: 两路对同一按键序列产出**相同字节**
-expected = "aZ7 "
-a_bytes = a
-b_bytes = "".join("<RET>" if x == "RET" else x for x in b)
-print("路径A 字节: %r" % a_bytes)
-print("路径B 字节: %r" % b_bytes)
-ok_a = (a_bytes == expected)
-ok_b = (b_bytes == expected + "<RET>")
+# 期望的**按键产出序列**（未施加行编辑前的原始字节）：
+#   a Z 7 ! <BS> 空格 RET
+# 路径B 的 token 即此序列（evdemo 逐条回显转换结果）。
+EXPECT_TOKENS = ["a", "Z", "7", "!", "BS", " ", "RET"]
+# 期望的**命令行**（经行编辑：BS 删掉 '!'，RET 提交）：
+#   a Z 7 空格 -> "aZ7 "
+EXPECT_LINE = "aZ7 "
+
+b_tokens = b
+print("路径B tokens: %r" % b_tokens)
+print("路径A 命令行: %r" % a)
 print("")
-print("  [%s] byte_path_matches_expected" % ("PASS" if ok_a else "FAIL"))
-print("  [%s] event_path_matches_expected" % ("PASS" if ok_b else "FAIL"))
-print("  [%s] two_paths_equivalent" % ("PASS" if ok_a and ok_b else "FAIL"))
+ok_a = (a == EXPECT_LINE)
+ok_b = (b_tokens == EXPECT_TOKENS)
+print("  [%s] byte_path_line      期望 %r" % ("PASS" if ok_a else "FAIL", EXPECT_LINE))
+print("  [%s] event_path_tokens   期望 %r" % ("PASS" if ok_b else "FAIL", EXPECT_TOKENS))
+# 「等价」的**实质判据**：路径B 的 token 施加与路径A 相同的行编辑规则
+# （BS 删除前一字符），应还原出路径A 的命令行。
+buf = []
+for tk in b_tokens:
+    if tk == "RET":
+        break
+    if tk == "BS":
+        if buf: buf.pop()
+        continue
+    buf.append(tk)
+reconstructed = "".join(buf)
+ok_eq = (reconstructed == a == EXPECT_LINE)
+print("  [%s] two_paths_equivalent  事件路径经行编辑还原=%r" % ("PASS" if ok_eq else "FAIL", reconstructed))
 print("")
-print("[eq] ---- %d/3 ----" % (int(ok_a) + int(ok_b) + int(ok_a and ok_b)))
+npass = int(ok_a) + int(ok_b) + int(ok_eq)
+print("[eq] ---- %d/3 ----" % npass)
