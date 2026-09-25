@@ -226,6 +226,13 @@ USER_PROGRAMS = (
     # 证明「事件流可被用户态消费、产出正确字节，且空读在内核阻塞而非自旋」。
     # 见 docs/TODO/terminal-input.md §6.13。
     "evdemo",
+    # `evsrcdemo`：`libline::EventSource`（**组件路径**）的真机验收。
+    # 与 `evdemo` 的差别：evdemo 是**诊断形态**，手搓 open/read/parse/feed，
+    # 绕开了 `EventSource`；故 `EventSource` 此前只有宿主单测、从未上真机。
+    # 本题补上该缺口——阶段 3「最小形态」要让 shell/login 改用 `EventSource`，
+    # 组件若不先在真机验过，阶段 3 一上线就炸。
+    # 见 docs/TODO/terminal-input.md §6.14.4g。
+    "evsrcdemo",
     # `blkdemo`：**诊断对照**——前台阻塞在 stdin（旧字节路径）。
     # 与 `evdemo` 的唯一差别是等待源（`KBD_WAITER` vs `IN_EVENT_WAITER`），
     # 用来判定 §6.13 的 CPU 缺陷归属。见 docs/TODO/terminal-input.md §6.13。
