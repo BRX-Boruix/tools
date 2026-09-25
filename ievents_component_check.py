@@ -34,7 +34,12 @@
   3. `shift_uppercase`      —— Shift+a 解出 `[CHAR A]`（修饰键状态机）
   4. `submit`               —— 回车解出 `[SUBMIT]`
   5. `backspace`            —— 退格解出 `[BACKSPACE]`
-  6. `blocking_semantics`   —— `wouldblock` 计数为 0（阻塞读生效，非自旋）
+  6. `blocking_semantics`   —— γ 结构不等式 `wouldblock <= items + 1`
+     (§6.14.4p, owner-adjudicated γ): every leaked WouldBlock must soon be
+     exchanged for a real input unit; spin is wb growing while items stalls.
+     The +1 is the structurally forced first round (buffer empty before any
+     refill), NOT a tuning constant. Relaxed criterion (wb < 100) was
+     explicitly rejected by the owner as a magic number.
   7. `clean_exit`           —— 按 q 后打印 PASS 与统计
 
 ## 与 evdemo 的关系（互补，不重复）
@@ -153,12 +158,14 @@ def main():
         checks.append(("submit", "[SUBMIT]" in seg))
         checks.append(("backspace", "[BACKSPACE]" in seg))
 
-        m = re.search(r"chars=(\d+) wouldblock=(\d+)", full)
+        m = re.search(r"chars=(\d+) items=(\d+) wouldblock=(\d+)", full)
         if m:
-            chars, wb = int(m.group(1)), int(m.group(2))
-            checks.append(("blocking_semantics", wb == 0))
+            chars, items, wb = int(m.group(1)), int(m.group(2)), int(m.group(3))
+            # γ (§6.14.4p, owner ruling): structural inequality, not a threshold.
+            # wb grows without items  <=>  user-mode spin.  Red on wb > items+1.
+            checks.append(("blocking_semantics", wb <= items + 1))
         else:
-            chars, wb = -1, -1
+            chars, items, wb = -1, -1, -1
             checks.append(("blocking_semantics", False))
         checks.append(("clean_exit", "[evsrcdemo] PASS" in full))
 
@@ -169,7 +176,7 @@ def main():
         print("")
         print("[evsrc] ---- %d/%d ----" % (npass, len(checks)))
         if chars >= 0:
-            print("[evsrc] chars=%d wouldblock=%d" % (chars, wb))
+            print("[evsrc] chars=%d items=%d wouldblock=%d" % (chars, items, wb))
         return 0 if npass == len(checks) else 1
     finally:
         try: proc.kill()
