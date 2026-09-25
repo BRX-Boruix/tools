@@ -63,8 +63,27 @@ def main():
         for ch in txt:
             key({" ": "spc", "|": "backslash"}.get(ch, ch), d)
 
-    print("[l2] waiting %ds for boot + selftest converge ..." % BOOT_WAIT)
-    time.sleep(BOOT_WAIT)
+    def snap():
+        try:
+            return open(LOG, "rb").read().decode("utf-8", "replace")
+        except OSError:
+            return ""
+
+    # 等到真的出现登录提示符，而不是固定秒数（§6.10）。
+    # selftest.py 会把 boruix.iso 换成自检镜像（开机跑约 300s 自检、永远不进 login），
+    # 固定秒数会让键敲进自检输出里——症状像「代码坏了」，实为测试环境被上一步改坏了。
+    # 轮询下若镜像被换过，会在 BOOT_WAIT 后**如实失败**，而不是把键喂给自检输出。
+    print("[l2] waiting up to %ds for the login prompt ..." % BOOT_WAIT)
+    _deadline = time.time() + BOOT_WAIT
+    while "username:" not in snap() and time.time() < _deadline:
+        time.sleep(1.0)
+    if "username:" not in snap():
+        print("[l2] FAIL: login prompt never appeared in %ds" % BOOT_WAIT)
+        print("[l2]        (did you run selftest.py? it replaces boruix.iso with the")
+        print("[l2]         selftest image, which boots straight into ~300s of tests)")
+        print("[l2]        rebuild the normal image first:  python main.py build")
+        proc.kill()
+        return 1
 
     # ---- 先过 login：username / password ----
     print("[l2] authenticating as alice ...")
@@ -77,12 +96,6 @@ def main():
 
     results = {}
     marks = {}
-
-    def snap():
-        try:
-            return open(LOG, "rb").read().decode("utf-8", "replace")
-        except OSError:
-            return ""
 
     # ---- 场景 1：输入 + 回车执行 ----
     print("[l2] scenario 1: 'echo hi' + Enter")
