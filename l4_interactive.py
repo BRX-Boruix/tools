@@ -168,9 +168,32 @@ def main():
     check("prompt_back_after_ctrl_c", "alice:/$" in after,
           "(Ctrl-C did not bring the prompt back)")
 
-    # --- 信号真的到了子进程：应有 SIGINT 记录 ---
-    check("sigint_reported", "SIGINT" in after or "signal" in after.lower(),
-          "(no SIGINT mention in the kernel/shell output)")
+    # --- 信号真的到了子进程 ---
+    #
+    # 【2026-09-25 修正】原断言是 `"SIGINT" in after or "signal" in after.lower()`，
+    # 它**永远无法通过**：本系统没有任何代码路径会打印 "SIGINT"/"signal"——
+    # shell 只在 `commands.rs:2773` 发信号（`kill(child, SIGINT)`），不打印；
+    # 内核里 SIGINT 仅出现在测试与文档注释中。故这是**测试缺陷**（假阴性），
+    # 不是产品缺陷：另外 8 项（含决定性的 `prompt_back_after_ctrl_c`）3/3 稳定通过。
+    #
+    # 改为断言**可观察的结果**，这才是「信号真的到了子进程」的确证：
+    #   1. 子进程**已不再运行**——`spinburn` 的文档明写「进程永不自然退出」
+    #      （`spinburn/src/main.rs:3`），故它消失只能是**被信号杀死**；
+    #   2. 且是在我们发 `^C` **之后**消失的（前一项 `child_still_running_before_ctrl_c`
+    #      已断言 `^C` 之前提示符尚未回来）。
+    # 两条合起来即「`^C` -> SIGINT -> 子进程终止」，且不依赖任何日志字符串（S09/S15）。
+    #
+    # 判据：**提示符回来之后**，串口里不再有任何 `[spinburn]` 输出。
+    #
+    # 注意 `after` 起始于子进程自报 `[spinburn] start`（那是 Ctrl-C **之前**的
+    # 输出），故不能直接在 `after` 里找 `[spinburn]`——会误判。正确做法是
+    # 取**首个提示符之后**的片段：若子进程仍在跑，它会继续往这里写。
+    _mark = "alice:/$"
+    _tail = after[after.find(_mark) + len(_mark):] if _mark in after else after
+    child_still_printing = "[spinburn]" in _tail
+    check("sigint_delivered_child_terminated",
+          ("alice:/$" in after) and not child_still_printing,
+          "(child still printing after the prompt came back -> signal did not kill it)")
 
     # --- shell 自己没被杀（目标必须是 child，不是自己） ---
     print("[l4] verifying the shell survived and still works ...")
