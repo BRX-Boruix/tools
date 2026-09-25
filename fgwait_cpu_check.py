@@ -10,8 +10,28 @@
 
 **注意**：不要用 `spinburn` 做对照——它本身设计即忙等，是伪对照（§6.13.8）。
 
-已知结论（2026-09-25）：shell 6.4% / blkdemo 100.0% / evdemo 99.6%。
-**本脚本只测量、不修复**；§6.13 尚未修复。
+## 历史结论（**修复前**，2026-09-25）
+
+    shell 6.4% / blkdemo 100.0% / evdemo 99.6%
+
+当时由此判定：缺陷**与等待源无关**（blkdemo 走字节路径、evdemo 走事件路径，
+两者同为 ~100%），真因是 `shell` 的前台等待循环——见 §6.13.3。
+
+## 现状（**§6.13 已修复**，`kernel aec095e`）
+
+§6.13 已修复并验收：根因是切换层在「无其他就绪进程」时 `revert` 并抛 `WouldBlock`，
+调用方紧循环重试（实测 8s 内 `wp_refused` 达 19378）。改为 `schedule_from_block`
+（`hlt` 挂起）后，`wp_refused` 降为 **0**。
+
+复测（2026-09-25，同一脚本、同一判据）：
+
+    shell idle 4.4% / blkdemo 21.6% / evdemo 23.1%
+
+残余的 18–27% **不是缺陷**：`shell` 用有界等待（`WAIT_SLICE_NS = 10ms`）以便在前台
+子进程运行期间仍能探 `^C`，故每秒醒来约 100 次；RIP 采样证实停机在 `halt`。
+详见 §6.13.6（含「改为事件驱动」的独立后续项）。
+
+**本脚本只测量、不修复。** 上述数字仅代表测量当时的构建。
 """
 import os, socket, subprocess, time, re
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
