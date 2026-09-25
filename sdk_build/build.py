@@ -221,6 +221,11 @@ USER_PROGRAMS = (
     # 验证「唯一就绪进程 busy-yield」是否会饿死其它进程。
     # 见 docs/TODO/terminal-input.md 6.12.8。
     "yielder",
+    # `evdemo`：I-EVENTS 阶段 2 的事件流端到端验收程序——直接 open/read
+    # `/devices/input/events`，经 `libsys::event` 转换层回显每个按键。
+    # 证明「事件流可被用户态消费、产出正确字节，且空读在内核阻塞而非自旋」。
+    # 见 docs/TODO/terminal-input.md §6.13。
+    "evdemo",
     "threaddemo",
     "userdrv",
     "driverd",

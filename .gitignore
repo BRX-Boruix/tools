@@ -29,3 +29,18 @@ yield_run_*.txt
 _p*.txt
 _p*.py
 _l4neg.py
+# I-EVENTS 阶段 2 验收证据/临时产物
+_evdemo_serial.txt
+_evbusy_serial.txt
+_evcpu_serial.txt
+_evcpu2_serial.txt
+_idlecpu_serial.txt
+_cmp_*.txt
+_spin_serial.txt
+_rip_serial.txt
+_grow_serial.txt
+_val_serial.txt
+_stat_serial.txt
+_clean_serial.txt
+_sym.py
+_dis.py
