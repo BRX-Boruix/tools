@@ -237,6 +237,14 @@ USER_PROGRAMS = (
     # 与 `evdemo` 的唯一差别是等待源（`KBD_WAITER` vs `IN_EVENT_WAITER`），
     # 用来判定 §6.13 的 CPU 缺陷归属。见 docs/TODO/terminal-input.md §6.13。
     "blkdemo",
+    # `consoled`：I-EVENTS 阶段 3 甲-a（ADR-045）——常驻字节生产者：事件流 →
+    # libsys keymap → /devices/console。P4 切换前无读者消费其产出，
+    # 上线本身零行为变化（见 docs/TODO/terminal-input.md §6.15.3）。
+    "consoled",
+    # `consoled-e2e`：console 环端到端阻塞-唤醒验收（writer/consumer 双角色），
+    # 经真实 syscall 跑完 CONSOLE_WAITER 的 park/wake 全往返。
+    # 见 docs/TODO/terminal-input.md §6.15.3。
+    "consoled-e2e",
     "threaddemo",
     "userdrv",
     "driverd",
