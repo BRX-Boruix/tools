@@ -194,11 +194,17 @@ def main() -> int:
     # 但 **“半途 rc=124” 是真失败**：内核挂死时既无 PANIC 也无 EXCEPTION，
     # 此前判定只看那三个字符串，于是挂死被静默算作“通过”——那是伪绿（S09/S10）。
     #
-    # 区分依据：收敛的套件会跑到最后一个测试块（序列末位是 test-fast4，
-    # sdk/selftest.py 侧无法知道内核实际测试总数）。故用“是否触及序列尾部”作为
-    # 软信号：未触及尾部且 rc=124 → 半途截断，判失败并如实报告。
+    # 区分依据：收敛的套件会跑到最后一个测试块。**尾标必须是「当前序列真正
+    # 的最后完成标记」**（S09 实证修正，2026-09-27）：旧尾标 ("test-fast4",
+    # "test-drv1", "test-loader", "test-vfs-m65") 里后三个是**旧序列的中段
+    # 块名**——`any()` 语义下，套件死在它们**之后**、fast4 **之前**（如 SMP
+    # 段挂死）时，日志里仍含旧块名 → 伪绿。现行序列的最后完成标记是
+    # `[test-fast4] process N exit(code=0) -- 0 = all writes ok`（main.rs
+    # 测试序列末段的唯一完成短语，其后的 test_waitpid_e2e 按设计 park 至
+    # 看门狗收割，即 rc=124 的「既有常驻空转终态」本体）。若未来序列尾部
+    # 变更，**必须同步本尾标**——见 sdk 仓 selftest.py 头部约定。
     if rc == 124:
-        tail_markers = ("test-fast4", "test-drv1", "test-loader", "test-vfs-m65")
+        tail_markers = ("0 = all writes ok", "[test-waitpid-e2e]")
         reached_tail = any(m in res["text"] for m in tail_markers)
         if not reached_tail:
             err(
