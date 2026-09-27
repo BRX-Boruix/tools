@@ -17,6 +17,11 @@ QEMU = os.path.join(ROOT, "envfiles", "tools", "qemu-stable",
 LOG = os.path.join(ROOT, "_t5_serial.log")
 PORT = 45493
 
+# ADR-048 扩展 E1：实例总数从构建 env 读（与 init/kernel 同源同值）；
+# 默认 2 = T5 既有轮转形态（N=2 时守护 2 个、轮转位 2 个）。
+N = int(os.environ.get("BORUIX_CONSOLES_N", "2"))
+N = max(1, min(N, 256))
+
 def main():
     if os.path.exists(LOG):
         os.remove(LOG)
@@ -60,8 +65,8 @@ def main():
         print("[t5] FAIL: no login prompt"); proc.kill(); return 1
     # S3: dual consoled
     n_con = len(re.findall(r"consoled started \(pid \d+\)", snap()))
-    print("[t5] S3 consoled daemons: %d (want 2)" % n_con)
-    if n_con != 2: ok = False
+    print("[t5] S3 consoled daemons: %d (want %d)" % (n_con, N))
+    if n_con != N: ok = False
     # S1: instance 0 getty + login + focus claim
     if not wait("instance 0", 15):
         print("[t5] S1 FAIL: no `instance 0` rotation marker"); ok = False

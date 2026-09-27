@@ -122,14 +122,16 @@ def main():
         txt2 = h.read().decode("utf-8", "replace")
     n_started = len(re.findall(r"consoled started \(pid \d+\)", txt2))
     n_respawn = len(re.findall(r"consoled was dead; respawned", txt2))
-    # ADR-048 T5-b（owner 裁决 B）：双守护形态——启动即 consoled[0]+consoled[1]
-    # 各一（`consoled started` 2 次）；判定随之更新：恰 2 次启动、0 误重生。
-    if n_started != 2 or n_respawn != 0:
-        print("[wd] FAIL: consoled started x%d, respawned x%d (want 2 and 0)"
-              % (n_started, n_respawn))
+    # ADR-048 T5-b + 扩展 E1：守护数 = N（env BORUIX_CONSOLES_N，默认 2 =
+    # T5 既有形态）；判定：恰 N 次启动、0 误重生。
+    N = int(os.environ.get("BORUIX_CONSOLES_N", "2"))
+    N = max(1, min(N, 256))
+    if n_started != N or n_respawn != 0:
+        print("[wd] FAIL: consoled started x%d, respawned x%d (want %d and 0)"
+              % (n_started, n_respawn, N))
         ok = False
     else:
-        print("[wd] S3 watchdog: no double-spawn, no false respawn (2 daemons kept)")
+        print("[wd] S3 watchdog: no double-spawn, no false respawn (%d daemons kept)" % N)
     # 第二轮真实登录可用 = 周期 2 后终端生产者仍在场：
     type_str("root\n")
     time.sleep(1.0)
