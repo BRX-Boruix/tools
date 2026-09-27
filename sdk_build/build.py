@@ -216,6 +216,10 @@ USER_PROGRAMS = (
     "login",
     "fpcheck",
     "tokendemo",
+    # `focusdemo`：ADR-048 T3 焦点门禁的**对抗验收**——以默认用户身份
+    # 调 FOCUS_SET(1)，内核必须 EACCES 拒绝（CAP_SYSTEM 门禁真拦）。
+    # 见 docs/adr/048-multi-terminal-console-instances-focus.md §3.1。
+    "focusdemo",
     "spinburn",
     # `yielder`：纯忙-yield 压测进程（不 sleep、不阻塞），用于判定实验——
     # 验证「唯一就绪进程 busy-yield」是否会饿死其它进程。
