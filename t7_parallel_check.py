@@ -61,13 +61,17 @@ def main():
     n_prompt = full.count("username:")
     print("[t7] S2 username prompts: %d (want >= %d)" % (n_prompt, N))
     if n_prompt < N: ok = False
-    # S3: kill focused session (last spawned = instance N-1)
-    m = re.findall(r"parallel session started \(pid (\d+) instance %d\)" % (N-1), full)
-    if not m:
-        print("[t7] S3 FAIL: instance %d pid not found" % (N-1)); ok = False
+    # S3: kill focused session。焦点实例**动态判定**（S09 证据链修正）：
+    # spawn-is-binding 下焦点 = 最后完成 spawn 的实例，exec 完成顺序是调度竞争
+    # 序（实测 0,1,3,2），不恒为 N-1——旧断言「last spawned = N-1」是 harness
+    # 假设错误，内核账本对账一直正确。
+    fm = re.findall(r"focus -> instance (\d+)", snap())
+    if not fm:
+        print("[t7] S3 FAIL: no focus marker to identify focused instance"); ok = False
+        inst = -1
     else:
-        pid = m[-1]
-        print("[t7] S3 ending focused session pid " + pid + " (instance %d) via 3 auth failures" % (N-1))
+        inst = int(fm[-1])
+        print("[t7] S3 focused instance (dynamic): %d; killing via 3 auth failures" % inst)
         # 焦点会话此刻是 **login**（未认证）——没有 shell/kill 可用；会话终止的
         # 诚实手段 = 3 次认证失败（p6 同款，R13 认证关口语义：login 失败退出）。
         named = {" ": "spc", "-": "minus", ".": "dot", "/": "slash"}
@@ -83,21 +87,21 @@ def main():
             print("[t7] S3 FAIL: no session-end marker"); ok = False
         else:
             tail = snap().split("parallel session ended")[-1][:200]
-            if ("instance %d" % (N-1)) not in tail:
+            if ("instance %d" % inst) not in tail:
                 print("[t7] S3 FAIL: end marker not instance-tagged: " + tail[:80]); ok = False
             else:
-                print("[t7] S3 ledger respawn trigger OK (instance %d)" % (N-1))
+                print("[t7] S3 ledger respawn trigger OK (instance %d)" % inst)
         if not wait("parallel session started (pid ", 30):
             print("[t7] S3 FAIL: no respawn spawn marker"); ok = False
-        elif ("instance %d)" % (N-1)) not in snap().split("parallel session ended")[-1][:400]:
+        elif ("instance %d)" % inst) not in snap().split("parallel session ended")[-1][:400]:
             print("[t7] S3 WARN: respawn instance tag not in immediate tail")
         else:
-            print("[t7] S3 respawn on instance %d OK" % (N-1))
+            print("[t7] S3 respawn on instance %d OK" % inst)
         # S4: focus follows
-        if not wait("focus -> instance %d" % (N-1), 40):
+        if not wait("focus -> instance %d" % inst, 40):
             print("[t7] S4 FAIL: focus did not follow respawn"); ok = False
         else:
-            print("[t7] S4 focus -> instance %d OK" % (N-1))
+            print("[t7] S4 focus -> instance %d OK" % inst)
     proc.kill()
     print("[t7] ---- " + ("PASS" if ok else "FAIL") + " ----")
     return 0 if ok else 1
