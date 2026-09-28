@@ -20,6 +20,9 @@ __pycache__/
 # 大体积音频测试素材（45MB wav，本地测试用，不提交；小体积 tone-*.wav 已入库）
 /diskfiles/nggyumix.wav
 
+# b3p 第三方程序的编译产物（由 `main.py b3p` 生成，属构建输出非源码）
+/diskfiles/3p/*.elf
+
 # 交互验收脚本的串口抓取与临时产物（本地诊断用，不提交）
 l*_serial.txt
 _l*_serial.log

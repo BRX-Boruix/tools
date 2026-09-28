@@ -17,7 +17,7 @@ BORUIX SDK 辅助工具统一入口。
 import argparse
 import sys
 
-from sdk_build import br, build, disk, limine_build, run
+from sdk_build import b3p, br, build, disk, limine_build, run
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -351,6 +351,33 @@ def build_parser() -> argparse.ArgumentParser:
     p_mkimg.add_argument("--label", default="BORUIX_DATA", help="EXT2 卷标名 (默认 BORUIX_DATA)")
     p_mkimg.add_argument("--force", "-f", action="store_true", help="强制覆盖已有磁盘镜像无需确认")
     p_mkimg.set_defaults(func=disk.cmd_mkimg)
+
+    # b3p 子命令：构建第三方程序并落到 sdk/diskfiles/3p/（数据盘 /3p/ 下）。
+    #
+    # 与 build 的 USER_PROGRAMS 是两条独立通道：第三方程序不进 liveCD payload、
+    # 不重编内核，只经数据盘在 /volumes/<label>/3p/<name>.elf 被 exec。
+    p_b3p = sub.add_parser(
+        "b3p",
+        help="构建第三方程序（清单见 sdk_build/b3p.py）并放入 sdk/diskfiles/3p/",
+    )
+    p_b3p.add_argument(
+        "--debug",
+        action="store_true",
+        help="以 debug 配置构建（默认 release：交付物体积/加载时间更优）",
+    )
+    p_b3p.add_argument(
+        "--prog",
+        action="append",
+        default=None,
+        metavar="NAME",
+        help="只构建指定程序（可重复）；名字须在清单中，拼错即报错",
+    )
+    p_b3p.add_argument(
+        "--list",
+        action="store_true",
+        help="只列出第三方程序清单，不构建",
+    )
+    p_b3p.set_defaults(func=b3p.cmd)
 
     return parser
 
