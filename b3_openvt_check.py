@@ -111,15 +111,29 @@ def main():
         print("[b3] S2 PASS: init created instance 4")
     time.sleep(2.0)
 
-    print("[b3] S3 running /programs/openvt.elf again (expect instance 5)")
-    type_str("/programs/openvt.elf\n")
-    if wait_log("[init] openvt: instance 5 created", 60) is None:
-        print("[b3] FAIL: no 'instance 5 created' from init patrol")
+    # S3: focus is claimed by the instance-4 login (B3-T2 getty claim
+    # semantics) so keystrokes naturally land on the new terminal.
+    # Log in ON instance 4: proves the new instance is usable end-to-end
+    # (login+bind+shell) AND monotonic allocation (next request = 5).
+    print("[b3] S3 login on new instance 4 (focus claimed by new getty)")
+    time.sleep(2.0)
+    type_str("alice\n")
+    time.sleep(2.5)
+    type_str("alicepw\n")
+    if wait_log("BORUIX shell", 60) is None:
+        print("[b3] FAIL: no shell on instance 4 (login/bind broken)")
         ok = False
     else:
-        print("[b3] S3 PASS: init created instance 5 (monotonic allocation)")
+        print("[b3] S3a PASS: instance 4 login+bind+shell works")
+    time.sleep(1.5)
+    print("[b3] S3b running /programs/openvt.elf (expect instance 5)")
+    type_str("/programs/openvt.elf\n")
+    if wait_log("[init] openvt: instance 5 created", 60) is None:
+        print("[b3] FAIL: no instance 5 created from init patrol")
+        ok = False
+    else:
+        print("[b3] S3b PASS: instance 5 created (monotonic allocation)")
     time.sleep(2.0)
-
     with open(LOG, "rb") as h:
         txt = h.read().decode("utf-8", "replace")
     n_dropped = len(re.findall(r"openvt request dropped", txt))
