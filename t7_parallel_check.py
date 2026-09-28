@@ -11,6 +11,7 @@ S4 focus follows respawn: `focus -> instance 3` seen again.
 judgement: S1-S4.
 """
 import os, socket, subprocess, sys, time, re
+from sdk_build import config
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 QEMU = os.path.join(ROOT, "envfiles", "tools", "qemu-stable",
                     "qemu-9.2.0-win64", "qemu-system-x86_64.exe")
@@ -21,7 +22,7 @@ N = int(os.environ.get("BORUIX_CONSOLES_N", "4"))
 def main():
     if os.path.exists(LOG):
         os.remove(LOG)
-    proc = subprocess.Popen([QEMU, "-cdrom", os.path.join(ROOT, "boruix.iso"),
+    proc = subprocess.Popen([QEMU, "-cdrom", config.OUTPUT_ISO,
         "-boot", "order=d", "-m", "256", "-display", "none",
         "-serial", "file:" + LOG,
         "-monitor", "tcp:127.0.0.1:%d,server,nowait" % PORT, "-no-reboot"],

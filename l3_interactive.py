@@ -18,6 +18,7 @@
   也能通过——它只是什么都没做而已。
 """
 import os
+from sdk_build import config
 import socket
 import subprocess
 import sys
@@ -37,7 +38,7 @@ PASSWORD = "alicepw"
 def main():
     qemu = [
         QEMU,
-        "-cdrom", os.path.join(ROOT, "boruix.iso"),
+        "-cdrom", config.OUTPUT_ISO,
         "-hda", os.path.join(ROOT, "disk.img"),
         "-boot", "order=d",
         "-m", "256",

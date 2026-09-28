@@ -19,10 +19,11 @@
       本脚本不含——单变量归因。
 """
 import os, re, socket, subprocess, sys, time
+from sdk_build import config
 
 ROOT = r"F:\boruix-project"
 QEMU = os.path.join(ROOT, "envfiles", "tools", "qemu-stable", "qemu-9.2.0-win64", "qemu-system-x86_64.exe")
-ISO = os.path.join(ROOT, "boruix.iso")
+ISO = config.OUTPUT_ISO
 DISK = os.path.join(ROOT, "disk.img")
 LOG = os.path.join(ROOT, "_p3_serial.log")
 PORT = 45631

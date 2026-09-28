@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """defect #2 batch boot: run N boots, capture any 'attempted to kill init' panic with the new vector/rip/error_code fields."""
 import os, re, subprocess, sys, time, socket
+from sdk_build import config
 
 ROOT = r"F:\boruix-project"
 QEMU = os.path.join(ROOT, "envfiles", "tools", "qemu-stable",
                     "qemu-9.2.0-win64", "qemu-system-x86_64.exe")
-ISO = os.path.join(ROOT, "boruix.iso")
+ISO = config.OUTPUT_ISO
 DISK = os.path.join(ROOT, "disk.img")
 PORT = 45481
 N = int(sys.argv[1]) if len(sys.argv) > 1 else 10

@@ -9,6 +9,7 @@ S2 run focusdemo as unprivileged shell child -> FOCUS_SET(1) must be
 judgement: S1 shell prompt + S2 [focusdemo] PASS line.
 """
 import os, socket, subprocess, sys, time
+from sdk_build import config
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 QEMU = os.path.join(ROOT, "envfiles", "tools", "qemu-stable",
                     "qemu-9.2.0-win64", "qemu-system-x86_64.exe")
@@ -18,7 +19,7 @@ PORT = 45492
 def main():
     if os.path.exists(LOG):
         os.remove(LOG)
-    proc = subprocess.Popen([QEMU, "-cdrom", os.path.join(ROOT, "boruix.iso"),
+    proc = subprocess.Popen([QEMU, "-cdrom", config.OUTPUT_ISO,
         "-boot", "order=d", "-m", "256", "-display", "none",
         "-serial", "file:" + LOG,
         "-monitor", "tcp:127.0.0.1:%d,server,nowait" % PORT, "-no-reboot"],

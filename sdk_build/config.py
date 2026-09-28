@@ -15,7 +15,13 @@ ENV_FILE = os.path.join(PROJECT_ROOT, ".env")
 # 构建目标（当前仅 x86_64）
 TARGET = "x86_64-unknown-none"
 QEMU = "qemu-system-x86_64"
-OUTPUT_ISO = os.path.join(PROJECT_ROOT, "boruix.iso")
+# ISO 输出路径。默认 <root>/boruix.iso（S17：与所有既有脚本/e2e 的接线一致）。
+# 可用 BORUIX_ISO_OUT 显式覆盖（S16：构建产物路径可配置——多工作区/CI 矩阵
+# 与「目标文件被System 持锁」这类环境事故下的显式逃生门；覆盖是全局的，
+# e2e 脚本同样读 config.OUTPUT_ISO，无第二份真值）。
+OUTPUT_ISO = os.environ.get("BORUIX_ISO_OUT") or os.path.join(
+    PROJECT_ROOT, "boruix.iso"
+)
 
 # ---------- 声卡（ICH6 / Intel HDA）----------
 #

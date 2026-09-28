@@ -279,6 +279,9 @@ USER_PROGRAMS = (
     # 经真实 syscall 跑完 CONSOLE_WAITER 的 park/wake 全往返。
     # 见 docs/TODO/terminal-input.md §6.15.3。
     "consoled-e2e",
+    # `openvt`: B3-C3 用户入口——写请求文件 /system/console-requests/<n>，
+    # init 巡检消费（文件协议，零新 syscall）。见 docs/TODO/terminal-input.md §8。
+    "openvt",
     "threaddemo",
     "userdrv",
     "driverd",

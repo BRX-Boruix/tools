@@ -17,13 +17,14 @@ stdin/stdout/stderr 是**同一个** console 节点，owner 自然与父相同�
   5. 三条 fd 的 is_terminal 都为 1（J-TOKEN-A 真值未被本次改动破坏）。
 """
 import os, re, socket, subprocess, sys, threading, time
+from sdk_build import config
 
 ROOT = r"F:\boruix-project"
 QEMU = os.path.join(ROOT, "envfiles", "tools", "qemu-stable", "qemu-9.2.0-win64", "qemu-system-x86_64.exe")
 PORT = 45567
 BOOT_WAIT = int(os.environ.get("BOOT_WAIT", "300"))
 
-qemu = [QEMU, "-cdrom", os.path.join(ROOT, "boruix.iso"), "-hda", os.path.join(ROOT, "disk.img"),
+qemu = [QEMU, "-cdrom", config.OUTPUT_ISO, "-hda", os.path.join(ROOT, "disk.img"),
         "-boot", "order=d", "-m", "256", "-display", "none", "-serial", "stdio",
         "-monitor", "tcp:127.0.0.1:%d,server,nowait" % PORT, "-no-reboot"]
 proc = subprocess.Popen(qemu, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)

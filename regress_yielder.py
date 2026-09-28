@@ -34,6 +34,7 @@
 查提示符。否则会匹配到 ctrl-c 之前回显的旧提示符，无论失败与否都判通过。
 """
 import os, socket, subprocess, sys, time
+from sdk_build import config
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 QEMU = os.path.join(ROOT, "envfiles", "tools", "qemu-stable", "qemu-9.2.0-win64", "qemu-system-x86_64.exe")
 BASE = 45600
@@ -43,7 +44,7 @@ def run_once(i):
     ser = os.path.join(ROOT, "yield_run_%d.txt" % i)
     try: os.remove(ser)
     except OSError: pass
-    proc = subprocess.Popen([QEMU, "-cdrom", os.path.join(ROOT, "boruix.iso"), "-boot", "order=d",
+    proc = subprocess.Popen([QEMU, "-cdrom", config.OUTPUT_ISO, "-boot", "order=d",
         "-m", "256", "-display", "none", "-serial", "file:" + ser,
         "-monitor", "tcp:127.0.0.1:%d,server,nowait" % port, "-no-reboot"],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
