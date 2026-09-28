@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-BORUIX SDK 辅助工具统一入口。
+BORUIX 系统工具统一入口（系统集成、构建与验收）。
 
 用法:
     python main.py <子命令> [选项]
@@ -11,19 +11,19 @@ BORUIX SDK 辅助工具统一入口。
     br       Build and Run：编译生成 ISO 后立即用 QEMU 启动
     --help   查看帮助
 
-各子命令的实现分散在 sdk_build/ 包中，本文件只负责入口与参数注册。
+各子命令的实现分散在 tools_build/ 包中，本文件只负责入口与参数注册。
 """
 
 import argparse
 import sys
 
-from sdk_build import b3p, br, build, disk, limine_build, run
+from tools_build import b3p, br, build, disk, limine_build, run
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="sdk",
-        description="BORUIX SDK 辅助工具主入口",
+        prog="tools",
+        description="BORUIX 系统工具主入口（构建/运行/验收；第三方 SDK 内容在 ../sdk）",
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -340,7 +340,7 @@ def build_parser() -> argparse.ArgumentParser:
     # mkimg 子命令：创建/格式化物理磁盘镜像
     p_mkimg = sub.add_parser(
         "mkimg",
-        help="由 sdk/diskfiles/ 创建或重新格式化数据盘镜像 (EXT2)",
+        help="由 tools/diskfiles/ 创建或重新格式化数据盘镜像 (EXT2)",
     )
     p_mkimg.add_argument(
         "--size",
@@ -352,13 +352,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_mkimg.add_argument("--force", "-f", action="store_true", help="强制覆盖已有磁盘镜像无需确认")
     p_mkimg.set_defaults(func=disk.cmd_mkimg)
 
-    # b3p 子命令：构建第三方程序并落到 sdk/diskfiles/3p/（数据盘 /3p/ 下）。
+    # b3p 子命令：构建第三方程序并落到 tools/diskfiles/3p/（数据盘 /3p/ 下）。
     #
     # 与 build 的 USER_PROGRAMS 是两条独立通道：第三方程序不进 liveCD payload、
     # 不重编内核，只经数据盘在 /volumes/<label>/3p/<name>.elf 被 exec。
     p_b3p = sub.add_parser(
         "b3p",
-        help="构建第三方程序（清单见 sdk_build/b3p.py）并放入 sdk/diskfiles/3p/",
+        help="构建第三方程序（清单见 tools_build/b3p.py）并放入 tools/diskfiles/3p/",
     )
     p_b3p.add_argument(
         "--debug",
