@@ -1,0 +1,18 @@
+tools: 新增 --liftoff（build/run/br）——用 liftoff(UEFI/OVMF) 引导
+
+- tools_build/liftoff.py（新）：build_efi()（cargo build --release --target
+  x86_64-unknown-uefi）、stage_esp()（摆 EFI/BOOT/BOOTX64.EFI）、ensure_ready()、
+  ovmf_firmware()（.env 的 QEMU_DIR + share/edk2-x86_64-code.fd）、uefi_args()；
+- main.py：build / run / br 三个子命令各加 --liftoff，与既有开关正交——
+  br --systemdisk --redisk --serial --release --liftoff 等组合均可解析；
+- build.py：**介质不变**（ISO/systemdisk 里已有 /boot/kernel 与 /programs/*，
+  liftoff 的 ISO9660 与 EXT2 两条路径都读得懂），只追加 liftoff.efi 与 ESP；
+  brxLimine 的 BIOS 路径原样保留 → 同一张盘 BIOS/UEFI 双启；
+- run.py：--liftoff 时追加 OVMF pflash + ESP，-boot order=c（从 ESP 起）；
+  该模式下**不传 -cpu max**——该 CPU 模型会在内核侧触发一个与 liftoff 无关的
+  panic（M12 实测：AP 启动路径的同核锁误判），内核侧修好后可去掉此分支；
+- 已验证：`run --systemdisk --serial --liftoff` 实际拉起的 QEMU 命令行含
+  pflash(edk2-x86_64-code.fd) + fat:rw:esp-liftoff，ESP 内 BOOTX64.EFI=52224B。
+
+待办（下一步）：br --liftoff 全链实跑（需先编用户态，介质才带 /programs）、
+以及把端到端验收放进 tools/checks/liftoff/（断言 init: loaded 与 PID 1 输出）。

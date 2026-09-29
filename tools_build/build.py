@@ -5,7 +5,7 @@ import os
 import shutil
 import subprocess
 
-from . import config
+from . import config, liftoff
 from .symbols import gen as gen_symbols
 from .util import err, info
 
@@ -449,5 +449,15 @@ def cmd(args: argparse.Namespace) -> int:
         return rc
     # --systemdisk：产系统盘而非 ISO（ADR-029 安装模式，恒走 brxLimine fork）。
     if getattr(args, "systemdisk", False):
-        return _make_system_disk(profile)
-    return _make_iso(profile)
+        rc = _make_system_disk(profile)
+    else:
+        rc = _make_iso(profile)
+    if rc != 0:
+        return rc
+    # --liftoff：介质不变（ISO/systemdisk 里已有 /boot/kernel 与 /programs），
+    # 只追加 liftoff.efi 与 ESP；brxLimine 的 BIOS 路径原样保留（同一张盘双启）。
+    if getattr(args, "liftoff", False):
+        liftoff.build_efi()
+        esp = liftoff.stage_esp()
+        info("liftoff ESP: " + esp + " (EFI/BOOT/BOOTX64.EFI)")
+    return rc

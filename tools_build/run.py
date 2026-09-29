@@ -5,7 +5,7 @@ import os
 import shutil
 import subprocess
 
-from . import config
+from . import config, liftoff
 from .util import err, info
 
 
@@ -109,10 +109,20 @@ def cmd(args: argparse.Namespace) -> int:
     with_disk = getattr(args, "disk", False)
     disk_mode = "redisk" if redisk else ("disk" if with_disk else ("nodisk" if nodisk else "livecd"))
 
+    # --liftoff：UEFI 链路（OVMF + ESP），介质与其它开关照旧。
+    liftoff_mode = bool(getattr(args, "liftoff", False))
+
     # SMP 多核：--smp N（默认 4）→ -smp N；--no-smp（None）→ 不传，单核启动。
     # 加 -cpu max 以启用现代 CPU 特性（多核下 APIC 拓扑/LAPIC id 分布更贴近真机）。
     smp_n = getattr(args, "smp", 4)
-    smp_args = ["-cpu", "max", "-smp", str(smp_n)] if smp_n is not None else []
+    # --liftoff 下不传 -cpu max：该 CPU 模型目前会在内核侧触发一个与 liftoff 无关的
+    # panic（M12 实测：-cpu max 下 AP 启动路径的同核锁误判）。内核侧修好后可去掉此分支。
+    if smp_n is None:
+        smp_args = []
+    elif liftoff_mode:
+        smp_args = ["-smp", str(smp_n)]
+    else:
+        smp_args = ["-cpu", "max", "-smp", str(smp_n)]
 
     ahci = bool(getattr(args, "ahci", False))
     if systemdisk:
@@ -145,10 +155,16 @@ def cmd(args: argparse.Namespace) -> int:
     if ahci:
         cmd += _ahci_controller_args()
     cmd += disk_args
-    cmd += ["-boot", "order=" + boot_order, "-m", str(args.mem),
+    cmd += ["-boot", "order=" + ("c" if liftoff_mode else boot_order), "-m", str(args.mem),
             "-netdev", "user,id=net0", "-device", "e1000,netdev=net0"]
     cmd += smp_args
     cmd += config.sound_card_args(silent=silent)
+    if liftoff_mode:
+        # UEFI：OVMF 固件 + ESP（liftoff.efi 摆成 EFI/BOOT/BOOTX64.EFI）。
+        # 介质参数照旧：liveCD 走 -cdrom ISO，--systemdisk 走上面的盘拓扑。
+        esp = liftoff.ensure_ready()
+        cmd += liftoff.uefi_args(esp)
+        info("引导器: liftoff (UEFI/OVMF), ESP=" + esp)
     if args.serial:
         cmd += ["-serial", "stdio"]
     extra = (" + 数据盘 " + os.path.basename(disk_path)) if disk_mode in ("disk", "redisk") else ""
@@ -159,4 +175,3 @@ def cmd(args: argparse.Namespace) -> int:
     info("存储控制器: " + ("AHCI (ich9-ahci, 显式)" if ahci else "PIIX4 IDE (默认)"))
     info("启动 QEMU: " + os.path.basename(qemu) + " (boot=" + ("c" if systemdisk else "d") + ")")
     return subprocess.run(cmd).returncode
-
