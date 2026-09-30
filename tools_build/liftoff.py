@@ -85,3 +85,10 @@ def uefi_args(esp: str) -> list:
         "-drive", "if=pflash,format=raw,readonly=on,file=" + ovmf_firmware(),
         "-drive", "format=raw,file=fat:rw:" + esp,
     ]
+
+def qemu_exe() -> str:
+    """qemu-system-x86_64 可执行文件（QEMU_DIR 优先）。"""
+    exe = os.path.join(_qemu_dir(), "qemu-system-x86_64.exe")
+    if not os.path.isfile(exe):
+        err("未找到 QEMU: " + exe)
+    return exe
