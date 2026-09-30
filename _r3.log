@@ -1,0 +1,19 @@
+F:\boruix-project\tools\tools_build\liftoff.py:86: SyntaxWarning: "\E" is an invalid escape sequence. Such sequences will not work in the future. Did you mean "\\E"? A raw string is also an option.
+  默认可移动路径 \EFI\BOOT\BOOTX64.EFI 建引导项；裸 IDE 挂载的 vvfat 盘在
+WARNING: Image format was not specified for 'F:\boruix-project\systemdisk.img' and probing guessed raw.
+         Automatically detecting the format is dangerous for raw images, write operations on block 0 will be restricted.
+         Specify the 'raw' format explicitly to remove the restrictions.
+WARNING: Image format was not specified for 'F:\boruix-project\disk.img' and probing guessed raw.
+         Automatically detecting the format is dangerous for raw images, write operations on block 0 will be restricted.
+         Specify the 'raw' format explicitly to remove the restrictions.
+F:\boruix-project\envfiles\tools\qemu-stable\qemu-9.2.0-win64\qemu-system-x86_64.exe: -device usb-storage,drive=liftoff-esp: No 'usb-bus' bus found for device 'usb-storage'
+[tools] 强制重建磁盘镜像: F:\boruix-project\disk.img (清除旧盘数据)
+[tools] 数据盘容量按内容推算: 60MB (7 个文件)
+[tools] 正在创建磁盘镜像: F:\boruix-project\disk.img (60MB, 122880 扇区)...
+[tools] 磁盘镜像创建成功: F:\boruix-project\disk.img (MBR Partition 1 -> EXT2 FS OK)
+[tools] 引导器: liftoff (UEFI/OVMF), ESP=F:\boruix-project\esp-liftoff
+[tools] 盘策略: redisk + 数据盘 disk.img
+[tools] CPU 拓扑: SMP 4 核
+[tools] 声卡: intel-hda + hda-output -> 本机喇叭 (dsound)
+[tools] 存储控制器: PIIX4 IDE (默认)
+[tools] 启动 QEMU: qemu-system-x86_64.exe (boot=c)

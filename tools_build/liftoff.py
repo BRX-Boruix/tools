@@ -80,10 +80,18 @@ def ensure_ready() -> str:
 
 
 def uefi_args(esp: str) -> list:
-    """OVMF 固件 + ESP 的 QEMU 参数（介质参数由调用方照旧拼接）。"""
+    """OVMF 固件 + ESP 的 QEMU 参数（介质参数由调用方照旧拼接）。
+
+    ESP 走 **USB 可移动介质**：OVMF 没有变量存储（未给 vars pflash）时，只对
+    默认可移动路径 EFI/BOOT/BOOTX64.EFI 建引导项；裸 IDE 挂载的 vvfat 盘在
+    多盘拓扑下不会被枚举成可引导设备（实测：只出 Boot0001 系统盘 + Boot0003
+    Internal Shell，直接掉进 UEFI Shell）。USB 挂载则必然枚举。
+    """
     return [
         "-drive", "if=pflash,format=raw,readonly=on,file=" + ovmf_firmware(),
-        "-drive", "format=raw,file=fat:rw:" + esp,
+        "-drive", "if=none,id=liftoff-esp,format=raw,file=fat:rw:" + esp,
+        "-device", "qemu-xhci",
+        "-device", "usb-storage,drive=liftoff-esp",
     ]
 
 def qemu_exe() -> str:

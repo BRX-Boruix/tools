@@ -1,14 +1,18 @@
-checks/tools: b2 支持 --liftoff（UEFI 路径）+ xorriso 从 MSYS2 解析
+fix(tools): --liftoff 的 ESP 改挂 USB 可移动介质（否则 OVMF 掉进 UEFI Shell）
 
-- config.py：新增 XORRISO 单点解析（PATH → 项目自备 MSYS2 的 usr/bin → ffmpeg）；
-  build.py 改为只读该常量。本机 xorriso 实测位于
-  envfiles/msys2/msys64/usr/bin/xorriso.exe —— 此前 build --liftoff 报 exit=1 无输出
-  就是因为 PATH 里没有它；
-- checks/boot/b2_systemdisk_check.py：加 --liftoff（OVMF + ESP + 同一张系统盘，
-  断言不变）与 --s1-timeout（UEFI 路径多一层 OVMF 初始化、内核装载更慢，默认 150s 不够）；
-- 实测：python main.py build --liftoff 现在 exit=0，产出 boruix.iso（26,275,840 B，
-  含 /programs）并摆好 ESP —— 且不需要任何 brxLimine BIOS 产物；
-- 实测（重要，负面）：b2 --liftoff --s1-timeout 420 → FAIL "no login prompt"。
-  串口显示内核走到 [kmain] init: spawned pid=1 from init.elf 之后**再无任何输出**
-  （日志 11246 B，spawn 在 11217）。同一张盘在 BIOS/brxLimine 路径可达登录。
-  → liftoff 下「PID 1 被创建」之后的推进尚未打通，这是"OS 完整可用"的当前缺口。
+症状（用户实测）：python main.py br --liftoff --release --serial --systemdisk --redisk
+停在 UEFI Interactive Shell；不带 --systemdisk 时也进不去系统。
+
+根因（OVMF BdsDxe 实录）：没有变量存储（未给 vars pflash）时，OVMF 只为**默认可移动
+路径** EFI/BOOT/BOOTX64.EFI 建引导项。裸 IDE 挂载的 vvfat ESP 在多盘拓扑下拿不到
+引导项——日志只有 Boot0001（系统盘，Not Found）与 Boot0003（Internal Shell），ESP 不在列。
+
+修复（tools_build/liftoff.py::uefi_args）：
+- 去掉 -boot order=c（强加 boot order 会让 OVMF 找不到引导项，直接进 Shell）；
+- ESP 改为 USB 可移动介质：-drive if=none,id=liftoff-esp,format=raw,file=fat:rw:<esp>
+  + -device qemu-xhci + -device usb-storage,drive=liftoff-esp。
+
+实测（run --liftoff --serial --systemdisk --redisk）：
+  BdsDxe: loading Boot0003 "UEFI QEMU QEMU USB HARDDRIVE ..." → starting
+  [liftoff] M2b entry → M2C: mount ok → M2C: len=8011504 → Hello, BORUIX!
+  [pmm] === LazyBuddy init: 28 memory-map entries ===

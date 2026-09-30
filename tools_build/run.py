@@ -155,7 +155,14 @@ def cmd(args: argparse.Namespace) -> int:
     if ahci:
         cmd += _ahci_controller_args()
     cmd += disk_args
-    cmd += ["-boot", "order=" + ("c" if liftoff_mode else boot_order), "-m", str(args.mem),
+    if liftoff_mode:
+        # UEFI：**不传 -boot**。没有 OVMF 变量存储时，OVMF 按默认可移动路径
+        # \EFI\BOOT\BOOTX64.EFI 起 ESP；强加 boot order 会让它找不到引导项，
+        # 直接掉进内置 UEFI Shell（实测症状）。
+        boot_args = []
+    else:
+        boot_args = ["-boot", "order=" + boot_order]
+    cmd += boot_args + ["-m", str(args.mem),
             "-netdev", "user,id=net0", "-device", "e1000,netdev=net0"]
     cmd += smp_args
     cmd += config.sound_card_args(silent=silent)
