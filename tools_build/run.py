@@ -115,12 +115,11 @@ def cmd(args: argparse.Namespace) -> int:
     # SMP 多核：--smp N（默认 4）→ -smp N；--no-smp（None）→ 不传，单核启动。
     # 加 -cpu max 以启用现代 CPU 特性（多核下 APIC 拓扑/LAPIC id 分布更贴近真机）。
     smp_n = getattr(args, "smp", 4)
-    # --liftoff 下不传 -cpu max：该 CPU 模型目前会在内核侧触发一个与 liftoff 无关的
-    # panic（M12 实测：-cpu max 下 AP 启动路径的同核锁误判）。内核侧修好后可去掉此分支。
+    # --liftoff 与 BIOS 路径使用同一 CPU 模型：此前 liftoff 会无视 SmpRequest.flags
+    # 无条件使能 x2APIC（-cpu max 支持 → 内核只有 xAPIC 路径而崩）。该违规已在
+    # liftoff 侧修正（读请求字段、按内核请求决定），故两条链路现在可以对等比较。
     if smp_n is None:
         smp_args = []
-    elif liftoff_mode:
-        smp_args = ["-smp", str(smp_n)]
     else:
         smp_args = ["-cpu", "max", "-smp", str(smp_n)]
 

@@ -26,12 +26,12 @@ def main() -> int:
         os.remove(LOG)
     fw = liftoff.ovmf_firmware()
     esp = liftoff.ensure_ready()
+    # 与 l1_boot_check 的参数集保持一致（-drive 而非 -hda；无 netdev/音频）。
+    # 此前用 -hda + netdev + 音频 时，OVMF 在固件阶段挂起（4 CPU 同 RIP，永不进入
+    # liftoff）——逐项排查：本参数集已在实测中通过到 spawn。
     qemu = [liftoff.qemu_exe(),
-            "-hda", disk.SYSTEM_DISK_IMG_PATH,
             "-m", a.mem, "-smp", "4",
-            "-netdev", "user,id=net0", "-device", "e1000,netdev=net0",
-            "-audiodev", "dsound,id=snd0", "-device", "intel-hda",
-            "-device", "hda-output,audiodev=snd0",
+            "-drive", "format=raw,file=" + disk.SYSTEM_DISK_IMG_PATH,
             "-drive", "if=pflash,format=raw,readonly=on,file=" + fw,
             "-drive", "format=raw,file=fat:rw:" + esp,
             "-serial", "file:" + LOG,
