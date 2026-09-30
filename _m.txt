@@ -1,0 +1,11 @@
+tools: --liftoff 跳过 BIOS 专属步骤（摆脱交叉工具链依赖）
+
+- _make_iso / _make_system_disk 增加 liftoff_only：跳过 brxLimine fork 产物拷贝、
+  El Torito "-b" 引导项、isohybrid MBR 写入、以及 EXT2 上的 BIOS 引导码安装；
+  理由：liftoff 走 UEFI/OVMF，读的是文件系统里的文件（/boot/kernel、/programs），
+  与 BIOS 引导码无关 → 该链路不再需要 i686-elf 交叉工具链；
+- 实测：python main.py build --systemdisk --liftoff → exit=0（本机既无 xorriso
+  也无 brxLimine fork 产物），产出 systemdisk.img 并顺带摆好 ESP；
+- 端到端：checks/liftoff/l1_boot_check.py --medium systemdisk → 6 锚全过
+  （含 [kmain] init: loaded 与 [kmain] init: spawned pid=1 from init.elf）；
+- 边界：ISO 链仍需 xorriso（本机未安装），--medium iso 未在本机实测。

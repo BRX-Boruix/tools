@@ -1,0 +1,1098 @@
+warning: unnecessary `unsafe` block
+   --> F:\boruix-project\libsys\src\allocator.rs:175:5
+    |
+175 |     unsafe {
+    |     ^^^^^^ unnecessary `unsafe` block
+    |
+    = note: `#[warn(unused_unsafe)]` (part of `#[warn(unused)]`) on by default
+
+warning: `libsys` (lib) generated 1 warning
+warning: unused import: `c_int`
+  --> F:\boruix-project\libc\src\pwd.rs:33:29
+   |
+33 | use crate::ctypes::{c_char, c_int};
+   |                             ^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: the feature `c_variadic` has been stable since 1.99.0 and no longer requires an attribute to enable
+  --> F:\boruix-project\libc\src\lib.rs:37:12
+   |
+37 | #![feature(c_variadic)]
+   |            ^^^^^^^^^^
+   |
+   = note: `#[warn(stable_features)]` on by default
+
+warning: variable does not need to be mutable
+   --> F:\boruix-project\libc\src\pwd.rs:598:9
+    |
+598 |     let mut push = |gid: u32, out: &mut [u32], n: &mut usize| {
+    |         ----^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `libc` (lib) generated 3 warnings (run `cargo fix --lib -p libc` to apply 2 suggestions)
+warning: unused dependency `libc`
+ --> Cargo.toml:8:1
+  |
+8 | libc = { path = "../libc" }
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `cargo::unused_dependencies` is set to `warn` by default
+help: consider removing the dependency on `libc`
+warning: `init` (manifest) generated 1 warning
+    Finished `release` profile [optimized] target(s) in 0.14s
+warning: unnecessary `unsafe` block
+   --> F:\boruix-project\libsys\src\allocator.rs:175:5
+    |
+175 |     unsafe {
+    |     ^^^^^^ unnecessary `unsafe` block
+    |
+    = note: `#[warn(unused_unsafe)]` (part of `#[warn(unused)]`) on by default
+
+warning: `libsys` (lib) generated 1 warning
+warning: unused import: `c_int`
+  --> F:\boruix-project\libc\src\pwd.rs:33:29
+   |
+33 | use crate::ctypes::{c_char, c_int};
+   |                             ^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: the feature `c_variadic` has been stable since 1.99.0 and no longer requires an attribute to enable
+  --> F:\boruix-project\libc\src\lib.rs:37:12
+   |
+37 | #![feature(c_variadic)]
+   |            ^^^^^^^^^^
+   |
+   = note: `#[warn(stable_features)]` on by default
+
+warning: variable does not need to be mutable
+   --> F:\boruix-project\libc\src\pwd.rs:598:9
+    |
+598 |     let mut push = |gid: u32, out: &mut [u32], n: &mut usize| {
+    |         ----^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `libc` (lib) generated 3 warnings (run `cargo fix --lib -p libc` to apply 2 suggestions)
+warning: unnecessary `unsafe` block
+   --> src\libc_check.rs:752:5
+    |
+752 |     unsafe {
+    |     ^^^^^^ unnecessary `unsafe` block
+    |
+    = note: `#[warn(unused_unsafe)]` (part of `#[warn(unused)]`) on by default
+
+warning: unnecessary `unsafe` block
+   --> src\libc_check.rs:851:5
+    |
+851 |     unsafe {
+    |     ^^^^^^ unnecessary `unsafe` block
+
+warning: constant `TABLE` is never used
+   --> src\libc_check.rs:604:19
+    |
+604 |             const TABLE: &str = "/config/users.json";
+    |                   ^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `shell` (bin "shell") generated 3 warnings
+    Finished `release` profile [optimized] target(s) in 0.29s
+warning: unnecessary `unsafe` block
+   --> F:\boruix-project\libsys\src\allocator.rs:175:5
+    |
+175 |     unsafe {
+    |     ^^^^^^ unnecessary `unsafe` block
+    |
+    = note: `#[warn(unused_unsafe)]` (part of `#[warn(unused)]`) on by default
+
+warning: `libsys` (lib) generated 1 warning
+    Finished `release` profile [optimized] target(s) in 0.21s
+warning: unnecessary `unsafe` block
+   --> F:\boruix-project\libsys\src\allocator.rs:175:5
+    |
+175 |     unsafe {
+    |     ^^^^^^ unnecessary `unsafe` block
+    |
+    = note: `#[warn(unused_unsafe)]` (part of `#[warn(unused)]`) on by default
+
+warning: `libsys` (lib) generated 1 warning
+    Finished `release` profile [optimized] target(s) in 0.22s
+warning: unnecessary `unsafe` block
+   --> F:\boruix-project\libsys\src\allocator.rs:175:5
+    |
+175 |     unsafe {
+    |     ^^^^^^ unnecessary `unsafe` block
+    |
+    = note: `#[warn(unused_unsafe)]` (part of `#[warn(unused)]`) on by default
+
+warning: `libsys` (lib) generated 1 warning
+    Finished `release` profile [optimized] target(s) in 0.24s
+warning: unnecessary `unsafe` block
+   --> F:\boruix-project\libsys\src\allocator.rs:175:5
+    |
+175 |     unsafe {
+    |     ^^^^^^ unnecessary `unsafe` block
+    |
+    = note: `#[warn(unused_unsafe)]` (part of `#[warn(unused)]`) on by default
+
+warning: `libsys` (lib) generated 1 warning
+    Finished `release` profile [optimized] target(s) in 0.22s
+warning: unnecessary `unsafe` block
+   --> F:\boruix-project\libsys\src\allocator.rs:175:5
+    |
+175 |     unsafe {
+    |     ^^^^^^ unnecessary `unsafe` block
+    |
+    = note: `#[warn(unused_unsafe)]` (part of `#[warn(unused)]`) on by default
+
+warning: `libsys` (lib) generated 1 warning
+warning: unused import: `c_int`
+  --> F:\boruix-project\libc\src\pwd.rs:33:29
+   |
+33 | use crate::ctypes::{c_char, c_int};
+   |                             ^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: the feature `c_variadic` has been stable since 1.99.0 and no longer requires an attribute to enable
+  --> F:\boruix-project\libc\src\lib.rs:37:12
+   |
+37 | #![feature(c_variadic)]
+   |            ^^^^^^^^^^
+   |
+   = note: `#[warn(stable_features)]` on by default
+
+warning: variable does not need to be mutable
+   --> F:\boruix-project\libc\src\pwd.rs:598:9
+    |
+598 |     let mut push = |gid: u32, out: &mut [u32], n: &mut usize| {
+    |         ----^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `libc` (lib) generated 3 warnings (run `cargo fix --lib -p libc` to apply 2 suggestions)
+warning: unnecessary `unsafe` block
+  --> src\main.rs:36:20
+   |
+36 |     let fd = match unsafe { open(TABLE, OpenFlags::CREATE_OR_TRUNCATE, Permissions::read_write()) } {
+   |                    ^^^^^^ unnecessary `unsafe` block
+   |
+   = note: `#[warn(unused_unsafe)]` (part of `#[warn(unused)]`) on by default
+
+warning: unnecessary `unsafe` block
+   --> src\main.rs:120:5
+    |
+120 |     unsafe { libc::errno::set_errno(0); }
+    |     ^^^^^^ unnecessary `unsafe` block
+
+warning: `pwde2e` (bin "pwde2e") generated 2 warnings
+    Finished `release` profile [optimized] target(s) in 0.27s
+warning: unnecessary `unsafe` block
+   --> F:\boruix-project\libsys\src\allocator.rs:175:5
+    |
+175 |     unsafe {
+    |     ^^^^^^ unnecessary `unsafe` block
+    |
+    = note: `#[warn(unused_unsafe)]` (part of `#[warn(unused)]`) on by default
+
+warning: `libsys` (lib) generated 1 warning
+warning: unused import: `c_int`
+  --> F:\boruix-project\libc\src\pwd.rs:33:29
+   |
+33 | use crate::ctypes::{c_char, c_int};
+   |                             ^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: the feature `c_variadic` has been stable since 1.99.0 and no longer requires an attribute to enable
+  --> F:\boruix-project\libc\src\lib.rs:37:12
+   |
+37 | #![feature(c_variadic)]
+   |            ^^^^^^^^^^
+   |
+   = note: `#[warn(stable_features)]` on by default
+
+warning: variable does not need to be mutable
+   --> F:\boruix-project\libc\src\pwd.rs:598:9
+    |
+598 |     let mut push = |gid: u32, out: &mut [u32], n: &mut usize| {
+    |         ----^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `libc` (lib) generated 3 warnings (run `cargo fix --lib -p libc` to apply 2 suggestions)
+    Finished `release` profile [optimized] target(s) in 0.26s
+warning: unnecessary `unsafe` block
+   --> F:\boruix-project\libsys\src\allocator.rs:175:5
+    |
+175 |     unsafe {
+    |     ^^^^^^ unnecessary `unsafe` block
+    |
+    = note: `#[warn(unused_unsafe)]` (part of `#[warn(unused)]`) on by default
+
+warning: `libsys` (lib) generated 1 warning
+warning: unused import: `c_int`
+  --> F:\boruix-project\libc\src\pwd.rs:33:29
+   |
+33 | use crate::ctypes::{c_char, c_int};
+   |                             ^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: the feature `c_variadic` has been stable since 1.99.0 and no longer requires an attribute to enable
+  --> F:\boruix-project\libc\src\lib.rs:37:12
+   |
+37 | #![feature(c_variadic)]
+   |            ^^^^^^^^^^
+   |
+   = note: `#[warn(stable_features)]` on by default
+
+warning: variable does not need to be mutable
+   --> F:\boruix-project\libc\src\pwd.rs:598:9
+    |
+598 |     let mut push = |gid: u32, out: &mut [u32], n: &mut usize| {
+    |         ----^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `libc` (lib) generated 3 warnings (run `cargo fix --lib -p libc` to apply 2 suggestions)
+    Finished `release` profile [optimized] target(s) in 0.26s
+warning: unnecessary `unsafe` block
+   --> F:\boruix-project\libsys\src\allocator.rs:175:5
+    |
+175 |     unsafe {
+    |     ^^^^^^ unnecessary `unsafe` block
+    |
+    = note: `#[warn(unused_unsafe)]` (part of `#[warn(unused)]`) on by default
+
+warning: `libsys` (lib) generated 1 warning
+warning: unused import: `c_int`
+  --> F:\boruix-project\libc\src\pwd.rs:33:29
+   |
+33 | use crate::ctypes::{c_char, c_int};
+   |                             ^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: the feature `c_variadic` has been stable since 1.99.0 and no longer requires an attribute to enable
+  --> F:\boruix-project\libc\src\lib.rs:37:12
+   |
+37 | #![feature(c_variadic)]
+   |            ^^^^^^^^^^
+   |
+   = note: `#[warn(stable_features)]` on by default
+
+warning: variable does not need to be mutable
+   --> F:\boruix-project\libc\src\pwd.rs:598:9
+    |
+598 |     let mut push = |gid: u32, out: &mut [u32], n: &mut usize| {
+    |         ----^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `libc` (lib) generated 3 warnings (run `cargo fix --lib -p libc` to apply 2 suggestions)
+warning: unused dependency `libc`
+ --> Cargo.toml:9:1
+  |
+9 | libc = { path = "../libc" }
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `cargo::unused_dependencies` is set to `warn` by default
+help: consider removing the dependency on `libc`
+warning: `tokendemo` (manifest) generated 1 warning
+    Finished `release` profile [optimized] target(s) in 0.23s
+warning: unnecessary `unsafe` block
+   --> F:\boruix-project\libsys\src\allocator.rs:175:5
+    |
+175 |     unsafe {
+    |     ^^^^^^ unnecessary `unsafe` block
+    |
+    = note: `#[warn(unused_unsafe)]` (part of `#[warn(unused)]`) on by default
+
+warning: `libsys` (lib) generated 1 warning
+warning: unused import: `c_int`
+  --> F:\boruix-project\libc\src\pwd.rs:33:29
+   |
+33 | use crate::ctypes::{c_char, c_int};
+   |                             ^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: the feature `c_variadic` has been stable since 1.99.0 and no longer requires an attribute to enable
+  --> F:\boruix-project\libc\src\lib.rs:37:12
+   |
+37 | #![feature(c_variadic)]
+   |            ^^^^^^^^^^
+   |
+   = note: `#[warn(stable_features)]` on by default
+
+warning: variable does not need to be mutable
+   --> F:\boruix-project\libc\src\pwd.rs:598:9
+    |
+598 |     let mut push = |gid: u32, out: &mut [u32], n: &mut usize| {
+    |         ----^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `libc` (lib) generated 3 warnings (run `cargo fix --lib -p libc` to apply 2 suggestions)
+warning: unused dependency `libc`
+ --> Cargo.toml:9:1
+  |
+9 | libc = { path = "../libc" }
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `cargo::unused_dependencies` is set to `warn` by default
+help: consider removing the dependency on `libc`
+warning: `focusdemo` (manifest) generated 1 warning
+    Finished `release` profile [optimized] target(s) in 0.26s
+warning: unnecessary `unsafe` block
+   --> F:\boruix-project\libsys\src\allocator.rs:175:5
+    |
+175 |     unsafe {
+    |     ^^^^^^ unnecessary `unsafe` block
+    |
+    = note: `#[warn(unused_unsafe)]` (part of `#[warn(unused)]`) on by default
+
+warning: `libsys` (lib) generated 1 warning
+warning: unused import: `c_int`
+  --> F:\boruix-project\libc\src\pwd.rs:33:29
+   |
+33 | use crate::ctypes::{c_char, c_int};
+   |                             ^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: the feature `c_variadic` has been stable since 1.99.0 and no longer requires an attribute to enable
+  --> F:\boruix-project\libc\src\lib.rs:37:12
+   |
+37 | #![feature(c_variadic)]
+   |            ^^^^^^^^^^
+   |
+   = note: `#[warn(stable_features)]` on by default
+
+warning: variable does not need to be mutable
+   --> F:\boruix-project\libc\src\pwd.rs:598:9
+    |
+598 |     let mut push = |gid: u32, out: &mut [u32], n: &mut usize| {
+    |         ----^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `libc` (lib) generated 3 warnings (run `cargo fix --lib -p libc` to apply 2 suggestions)
+warning: unused dependency `libc`
+ --> Cargo.toml:9:1
+  |
+9 | libc = { path = "../libc" }
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `cargo::unused_dependencies` is set to `warn` by default
+help: consider removing the dependency on `libc`
+warning: `spinburn` (manifest) generated 1 warning
+    Finished `release` profile [optimized] target(s) in 0.26s
+warning: unnecessary `unsafe` block
+   --> F:\boruix-project\libsys\src\allocator.rs:175:5
+    |
+175 |     unsafe {
+    |     ^^^^^^ unnecessary `unsafe` block
+    |
+    = note: `#[warn(unused_unsafe)]` (part of `#[warn(unused)]`) on by default
+
+warning: `libsys` (lib) generated 1 warning
+warning: unused import: `c_int`
+  --> F:\boruix-project\libc\src\pwd.rs:33:29
+   |
+33 | use crate::ctypes::{c_char, c_int};
+   |                             ^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: the feature `c_variadic` has been stable since 1.99.0 and no longer requires an attribute to enable
+  --> F:\boruix-project\libc\src\lib.rs:37:12
+   |
+37 | #![feature(c_variadic)]
+   |            ^^^^^^^^^^
+   |
+   = note: `#[warn(stable_features)]` on by default
+
+warning: variable does not need to be mutable
+   --> F:\boruix-project\libc\src\pwd.rs:598:9
+    |
+598 |     let mut push = |gid: u32, out: &mut [u32], n: &mut usize| {
+    |         ----^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `libc` (lib) generated 3 warnings (run `cargo fix --lib -p libc` to apply 2 suggestions)
+warning: unused dependency `libc`
+ --> Cargo.toml:9:1
+  |
+9 | libc = { path = "../libc" }
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `cargo::unused_dependencies` is set to `warn` by default
+help: consider removing the dependency on `libc`
+warning: `yielder` (manifest) generated 1 warning
+    Finished `release` profile [optimized] target(s) in 0.25s
+warning: unnecessary `unsafe` block
+   --> F:\boruix-project\libsys\src\allocator.rs:175:5
+    |
+175 |     unsafe {
+    |     ^^^^^^ unnecessary `unsafe` block
+    |
+    = note: `#[warn(unused_unsafe)]` (part of `#[warn(unused)]`) on by default
+
+warning: `libsys` (lib) generated 1 warning
+warning: unused dependency `libline`
+ --> Cargo.toml:9:1
+  |
+9 | libline = { path = "../libline" }
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `cargo::unused_dependencies` is set to `warn` by default
+help: consider removing the dependency on `libline`
+warning: `evdemo` (manifest) generated 1 warning
+    Finished `release` profile [optimized] target(s) in 0.20s
+warning: unnecessary `unsafe` block
+   --> F:\boruix-project\libsys\src\allocator.rs:175:5
+    |
+175 |     unsafe {
+    |     ^^^^^^ unnecessary `unsafe` block
+    |
+    = note: `#[warn(unused_unsafe)]` (part of `#[warn(unused)]`) on by default
+
+warning: `libsys` (lib) generated 1 warning
+    Finished `release` profile [optimized] target(s) in 0.23s
+warning: unnecessary `unsafe` block
+   --> F:\boruix-project\libsys\src\allocator.rs:175:5
+    |
+175 |     unsafe {
+    |     ^^^^^^ unnecessary `unsafe` block
+    |
+    = note: `#[warn(unused_unsafe)]` (part of `#[warn(unused)]`) on by default
+
+warning: `libsys` (lib) generated 1 warning
+    Finished `release` profile [optimized] target(s) in 0.21s
+warning: unnecessary `unsafe` block
+   --> F:\boruix-project\libsys\src\allocator.rs:175:5
+    |
+175 |     unsafe {
+    |     ^^^^^^ unnecessary `unsafe` block
+    |
+    = note: `#[warn(unused_unsafe)]` (part of `#[warn(unused)]`) on by default
+
+warning: `libsys` (lib) generated 1 warning
+    Finished `release` profile [optimized] target(s) in 0.23s
+warning: unnecessary `unsafe` block
+   --> F:\boruix-project\libsys\src\allocator.rs:175:5
+    |
+175 |     unsafe {
+    |     ^^^^^^ unnecessary `unsafe` block
+    |
+    = note: `#[warn(unused_unsafe)]` (part of `#[warn(unused)]`) on by default
+
+warning: `libsys` (lib) generated 1 warning
+    Finished `release` profile [optimized] target(s) in 0.22s
+warning: unnecessary `unsafe` block
+   --> F:\boruix-project\libsys\src\allocator.rs:175:5
+    |
+175 |     unsafe {
+    |     ^^^^^^ unnecessary `unsafe` block
+    |
+    = note: `#[warn(unused_unsafe)]` (part of `#[warn(unused)]`) on by default
+
+warning: `libsys` (lib) generated 1 warning
+    Finished `release` profile [optimized] target(s) in 0.20s
+warning: unnecessary `unsafe` block
+   --> F:\boruix-project\libsys\src\allocator.rs:175:5
+    |
+175 |     unsafe {
+    |     ^^^^^^ unnecessary `unsafe` block
+    |
+    = note: `#[warn(unused_unsafe)]` (part of `#[warn(unused)]`) on by default
+
+warning: `libsys` (lib) generated 1 warning
+warning: unused import: `c_int`
+  --> F:\boruix-project\libc\src\pwd.rs:33:29
+   |
+33 | use crate::ctypes::{c_char, c_int};
+   |                             ^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: the feature `c_variadic` has been stable since 1.99.0 and no longer requires an attribute to enable
+  --> F:\boruix-project\libc\src\lib.rs:37:12
+   |
+37 | #![feature(c_variadic)]
+   |            ^^^^^^^^^^
+   |
+   = note: `#[warn(stable_features)]` on by default
+
+warning: variable does not need to be mutable
+   --> F:\boruix-project\libc\src\pwd.rs:598:9
+    |
+598 |     let mut push = |gid: u32, out: &mut [u32], n: &mut usize| {
+    |         ----^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `libc` (lib) generated 3 warnings (run `cargo fix --lib -p libc` to apply 2 suggestions)
+    Finished `release` profile [optimized] target(s) in 0.24s
+warning: unnecessary `unsafe` block
+   --> F:\boruix-project\libsys\src\allocator.rs:175:5
+    |
+175 |     unsafe {
+    |     ^^^^^^ unnecessary `unsafe` block
+    |
+    = note: `#[warn(unused_unsafe)]` (part of `#[warn(unused)]`) on by default
+
+warning: `libsys` (lib) generated 1 warning
+    Finished `release` profile [optimized] target(s) in 0.24s
+warning: unnecessary `unsafe` block
+   --> F:\boruix-project\libsys\src\allocator.rs:175:5
+    |
+175 |     unsafe {
+    |     ^^^^^^ unnecessary `unsafe` block
+    |
+    = note: `#[warn(unused_unsafe)]` (part of `#[warn(unused)]`) on by default
+
+warning: `libsys` (lib) generated 1 warning
+    Finished `release` profile [optimized] target(s) in 0.22s
+warning: unnecessary `unsafe` block
+   --> F:\boruix-project\libsys\src\allocator.rs:175:5
+    |
+175 |     unsafe {
+    |     ^^^^^^ unnecessary `unsafe` block
+    |
+    = note: `#[warn(unused_unsafe)]` (part of `#[warn(unused)]`) on by default
+
+warning: `libsys` (lib) generated 1 warning
+    Finished `release` profile [optimized] target(s) in 0.21s
+warning: unnecessary `unsafe` block
+   --> F:\boruix-project\libsys\src\allocator.rs:175:5
+    |
+175 |     unsafe {
+    |     ^^^^^^ unnecessary `unsafe` block
+    |
+    = note: `#[warn(unused_unsafe)]` (part of `#[warn(unused)]`) on by default
+
+warning: `libsys` (lib) generated 1 warning
+warning: unused import: `libsys::*`
+  --> src\codec_route.rs:14:5
+   |
+14 | use libsys::*;
+   |     ^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `libsys::*`
+  --> src\codec_amp.rs:10:5
+   |
+10 | use libsys::*;
+   |     ^^^^^^^^^
+
+warning: `intel-hda` (bin "intel-hda") generated 2 warnings (run `cargo fix --bin "intel-hda" -p intel-hda` to apply 2 suggestions)
+    Finished `release` profile [optimized] target(s) in 0.23s
+warning: unnecessary `unsafe` block
+   --> F:\boruix-project\libsys\src\allocator.rs:175:5
+    |
+175 |     unsafe {
+    |     ^^^^^^ unnecessary `unsafe` block
+    |
+    = note: `#[warn(unused_unsafe)]` (part of `#[warn(unused)]`) on by default
+
+warning: `libsys` (lib) generated 1 warning
+    Finished `release` profile [optimized] target(s) in 0.22s
+warning: unnecessary `unsafe` block
+   --> F:\boruix-project\libsys\src\allocator.rs:175:5
+    |
+175 |     unsafe {
+    |     ^^^^^^ unnecessary `unsafe` block
+    |
+    = note: `#[warn(unused_unsafe)]` (part of `#[warn(unused)]`) on by default
+
+warning: `libsys` (lib) generated 1 warning
+    Finished `release` profile [optimized] target(s) in 0.20s
+warning: unnecessary `unsafe` block
+   --> F:\boruix-project\libsys\src\allocator.rs:175:5
+    |
+175 |     unsafe {
+    |     ^^^^^^ unnecessary `unsafe` block
+    |
+    = note: `#[warn(unused_unsafe)]` (part of `#[warn(unused)]`) on by default
+
+warning: `libsys` (lib) generated 1 warning
+    Finished `release` profile [optimized] target(s) in 0.21s
+warning: unnecessary `unsafe` block
+   --> F:\boruix-project\libsys\src\allocator.rs:175:5
+    |
+175 |     unsafe {
+    |     ^^^^^^ unnecessary `unsafe` block
+    |
+    = note: `#[warn(unused_unsafe)]` (part of `#[warn(unused)]`) on by default
+
+warning: `libsys` (lib) generated 1 warning
+warning: unused import: `c_int`
+  --> F:\boruix-project\libc\src\pwd.rs:33:29
+   |
+33 | use crate::ctypes::{c_char, c_int};
+   |                             ^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: the feature `c_variadic` has been stable since 1.99.0 and no longer requires an attribute to enable
+  --> F:\boruix-project\libc\src\lib.rs:37:12
+   |
+37 | #![feature(c_variadic)]
+   |            ^^^^^^^^^^
+   |
+   = note: `#[warn(stable_features)]` on by default
+
+warning: variable does not need to be mutable
+   --> F:\boruix-project\libc\src\pwd.rs:598:9
+    |
+598 |     let mut push = |gid: u32, out: &mut [u32], n: &mut usize| {
+    |         ----^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `libc` (lib) generated 3 warnings (run `cargo fix --lib -p libc` to apply 2 suggestions)
+    Finished `release` profile [optimized] target(s) in 0.25s
+[crt] chelldemo.elf -> F:\boruix-project\csrc\_build\chelldemo.elf
+prog\pthreaddemo.c:85:1: warning: non-void function does not return a value [-Wreturn-type]
+   85 | }
+      | ^
+1 warning generated.
+[crt] pthreaddemo.elf -> F:\boruix-project\csrc\_build\pthreaddemo.elf
+F:\boruix-project\csrc\pthread_sync.c:54:34: warning: incompatible pointer types passing 'volatile unsigned long *' to parameter of type 'const volatile int *' [-Wincompatible-pointer-types]
+   54 |         unsigned long e = ld_rlx(&p->epoch);
+      |                                  ^~~~~~~~~
+F:\boruix-project\csrc\pthread_sync.c:26:46: note: passing argument to parameter 'p' here
+   26 | static inline int ld_rlx(const volatile int* p) { return __atomic_load_n((const int*)p, __ATOMIC_RELAXED); }
+      |                                              ^
+F:\boruix-project\csrc\pthread_sync.c:147:34: warning: incompatible pointer types passing 'volatile unsigned long *' to parameter of type 'const volatile int *' [-Wincompatible-pointer-types]
+  147 |         unsigned long e = ld_rlx(&p->epoch);                 /* snapshot before deciding */
+      |                                  ^~~~~~~~~
+F:\boruix-project\csrc\pthread_sync.c:26:46: note: passing argument to parameter 'p' here
+   26 | static inline int ld_rlx(const volatile int* p) { return __atomic_load_n((const int*)p, __ATOMIC_RELAXED); }
+      |                                              ^
+2 warnings generated.
+prog\pthread_syncdemo.c:127:1: warning: non-void function does not return a value [-Wreturn-type]
+  127 | }
+      | ^
+1 warning generated.
+[crt] pthread_syncdemo.elf -> F:\boruix-project\csrc\_build\pthread_syncdemo.elf
+F:\boruix-project\csrc\pthread_sync.c:54:34: warning: incompatible pointer types passing 'volatile unsigned long *' to parameter of type 'const volatile int *' [-Wincompatible-pointer-types]
+   54 |         unsigned long e = ld_rlx(&p->epoch);
+      |                                  ^~~~~~~~~
+F:\boruix-project\csrc\pthread_sync.c:26:46: note: passing argument to parameter 'p' here
+   26 | static inline int ld_rlx(const volatile int* p) { return __atomic_load_n((const int*)p, __ATOMIC_RELAXED); }
+      |                                              ^
+F:\boruix-project\csrc\pthread_sync.c:147:34: warning: incompatible pointer types passing 'volatile unsigned long *' to parameter of type 'const volatile int *' [-Wincompatible-pointer-types]
+  147 |         unsigned long e = ld_rlx(&p->epoch);                 /* snapshot before deciding */
+      |                                  ^~~~~~~~~
+F:\boruix-project\csrc\pthread_sync.c:26:46: note: passing argument to parameter 'p' here
+   26 | static inline int ld_rlx(const volatile int* p) { return __atomic_load_n((const int*)p, __ATOMIC_RELAXED); }
+      |                                              ^
+2 warnings generated.
+prog\pthread_bench.c:72:1: warning: non-void function does not return a value [-Wreturn-type]
+   72 | }
+      | ^
+1 warning generated.
+[crt] pthread_bench.elf -> F:\boruix-project\csrc\_build\pthread_bench.elf
+[crt] forkdemo.elf -> F:\boruix-project\csrc\_build\forkdemo.elf
+   Compiling kernel v0.1.0 (F:\boruix-project\kernel\crates\kernel)
+warning: the feature `const_nonnull_new` has been stable since 1.85.0 and no longer requires an attribute to enable
+ --> vendor\brxlimine-rs\src\lib.rs:7:12
+  |
+7 | #![feature(const_nonnull_new)]
+  |            ^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(stable_features)]` on by default
+
+warning: `brxlimine-rs` (lib) generated 1 warning
+warning: unused doc comment
+   --> crates\arch\arch-x86_64\src\interrupts.rs:663:1
+    |
+663 | / /// è°ƒåº¦å™¨ tick å›è°ƒï¼ˆM4.2ï¼‰ï¼šæ¯æ¬¡ LAPIC å®šæ—¶å™¨ä¸­æ–­ï¼ˆIRQ0ï¼‰åè°ƒç”¨ã€‚
+664 | | ///
+665 | | /// ç”±è°ƒåº¦å™¨æ³¨å†Œï¼ˆkernel å±‚ï¼‰ã€‚å›è°ƒæŒæœ‰ `&mut InterruptFrame`ï¼Œå¯**æ•´ä½“æ”¹å†™**
+666 | | /// ä¸­æ–­å¸§ï¼ˆå¯„å­˜å™¨ + iretq å¸§ï¼‰ä¸ºå¦ä¸€è¿›ç¨‹çš„ä¿å­˜å¸§ï¼Œå¹¶åˆ‡æ¢ CR3/TSS.RSP0ï¼›
+...   |
+701 | | ///   - RSP = è¿›å…¥æ—¶çš„ç”¨æˆ· RSPï¼ˆé¡»åœ¨ä»»ä½•åˆ‡æ ˆ**ä¹‹å‰**ä¿å­˜ï¼‰ï¼›
+702 | | ///   - SS = ç”¨æˆ·æ•°æ®æ®µã€‚
+    | |_------------------------^
+    |   |
+    |   rustdoc does not generate documentation for macro invocations
+    |
+    = help: to document an item produced by a macro, the macro must produce the documentation as part of its expansion
+    = note: `#[warn(unused_doc_comments)]` (part of `#[warn(unused)]`) on by default
+
+warning[E0133]: use of inline assembly is unsafe and requires unsafe block
+   --> crates\arch\arch-x86_64\src\percpu.rs:225:5
+    |
+225 |     core::arch::asm!("swapgs", options(nostack, nomem, preserves_flags));
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ use of inline assembly
+    |
+    = note: inline assembly is entirely unchecked and can cause undefined behavior
+note: an unsafe function restricts its caller, but its body is safe by default
+   --> crates\arch\arch-x86_64\src\percpu.rs:224:1
+    |
+224 | pub unsafe fn swapgs() {
+    | ^^^^^^^^^^^^^^^^^^^^^^
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+    = note: `#[warn(unsafe_op_in_unsafe_fn)]` (part of `#[warn(rust_2024_compatibility)]`) on by default
+
+warning[E0133]: use of inline assembly is unsafe and requires unsafe block
+   --> crates\arch\arch-x86_64\src\syscall.rs:124:5
+    |
+124 | /     core::arch::asm!("rdmsr", in("ecx") msr, out("eax") lo, out("edx") hi,
+125 | |         options(nostack, nomem, preserves_flags));
+    | |_________________________________________________^ use of inline assembly
+    |
+    = note: inline assembly is entirely unchecked and can cause undefined behavior
+note: an unsafe function restricts its caller, but its body is safe by default
+   --> crates\arch\arch-x86_64\src\syscall.rs:121:1
+    |
+121 | unsafe fn rdmsr(msr: u32) -> u64 {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: use of inline assembly is unsafe and requires unsafe block
+   --> crates\arch\arch-x86_64\src\syscall.rs:132:5
+    |
+132 | /     core::arch::asm!("wrmsr", in("ecx") msr, in("eax") v as u32, in("edx") (v >> 32) as u32,
+133 | |         options(nostack, nomem, preserves_flags));
+    | |_________________________________________________^ use of inline assembly
+    |
+    = note: inline assembly is entirely unchecked and can cause undefined behavior
+note: an unsafe function restricts its caller, but its body is safe by default
+   --> crates\arch\arch-x86_64\src\syscall.rs:131:1
+    |
+131 | unsafe fn wrmsr(msr: u32, v: u64) {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning: variable does not need to be mutable
+   --> crates\arch\arch-x86_64\src\syscall.rs:400:9
+    |
+400 |     let mut probe = |nr: u64| -> u64 {
+    |         ----^^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+For more information about this error, try `rustc --explain E0133`.
+warning: `arch-x86_64` (lib) generated 5 warnings (run `cargo fix --lib -p arch-x86_64` to apply 4 suggestions)
+warning: unused import: `AccessPolicy`
+  --> crates\vfs\src\mount.rs:26:20
+   |
+26 | use crate::inode::{AccessPolicy, FileSystem, INode, INodeType};
+   |                    ^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `read`
+  --> crates\vfs\src\stdio.rs:77:20
+   |
+77 | fn stream_metadata(read: bool, write: bool) -> Result<FileMetadata, Error> {
+   |                    ^^^^ help: if this is intentional, prefix it with an underscore: `_read`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `error`
+  --> crates\driver\src\drivers\atapi_cdrom.rs:23:12
+   |
+23 | use klib::{error, info};
+   |            ^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: value assigned to `hi` is never read
+    --> crates\driver\src\drivers\ahci.rs:1198:23
+     |
+1198 |     let mut hi: u64 = u64::MAX;
+     |                       ^^^^^^^^ this value is reassigned later and never used
+...
+1205 |     hi = LBA48_LIMIT - 1;
+     |     -------------------- `hi` is overwritten here before the previous value is read
+     |
+     = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: `vfs` (lib) generated 2 warnings (run `cargo fix --lib -p vfs` to apply 2 suggestions)
+warning: `driver` (lib) generated 2 warnings (run `cargo fix --lib -p driver` to apply 1 suggestion)
+warning: unused import: `alloc::format`
+  --> crates\fs\src\iso9660.rs:15:5
+   |
+15 | use alloc::format;
+   |     ^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> crates\fs\src\ext2.rs:369:13
+    |
+369 |         let mut inner = Ext2Inner {
+    |             ----^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `fs` (lib) generated 2 warnings (run `cargo fix --lib -p fs` to apply 2 suggestions)
+warning: function `is_install_mode` is never used
+  --> crates\kernel\src\vfs_init.rs:45:8
+   |
+45 | pub fn is_install_mode() -> bool {
+   |        ^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `kernel` (bin "kernel") generated 1 warning
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.91s
+warning: the feature `const_nonnull_new` has been stable since 1.85.0 and no longer requires an attribute to enable
+ --> vendor\brxlimine-rs\src\lib.rs:7:12
+  |
+7 | #![feature(const_nonnull_new)]
+  |            ^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(stable_features)]` on by default
+
+warning: `brxlimine-rs` (lib) generated 1 warning
+warning: unused doc comment
+   --> crates\arch\arch-x86_64\src\interrupts.rs:663:1
+    |
+663 | / /// è°ƒåº¦å™¨ tick å›è°ƒï¼ˆM4.2ï¼‰ï¼šæ¯æ¬¡ LAPIC å®šæ—¶å™¨ä¸­æ–­ï¼ˆIRQ0ï¼‰åè°ƒç”¨ã€‚
+664 | | ///
+665 | | /// ç”±è°ƒåº¦å™¨æ³¨å†Œï¼ˆkernel å±‚ï¼‰ã€‚å›è°ƒæŒæœ‰ `&mut InterruptFrame`ï¼Œå¯**æ•´ä½“æ”¹å†™**
+666 | | /// ä¸­æ–­å¸§ï¼ˆå¯„å­˜å™¨ + iretq å¸§ï¼‰ä¸ºå¦ä¸€è¿›ç¨‹çš„ä¿å­˜å¸§ï¼Œå¹¶åˆ‡æ¢ CR3/TSS.RSP0ï¼›
+...   |
+701 | | ///   - RSP = è¿›å…¥æ—¶çš„ç”¨æˆ· RSPï¼ˆé¡»åœ¨ä»»ä½•åˆ‡æ ˆ**ä¹‹å‰**ä¿å­˜ï¼‰ï¼›
+702 | | ///   - SS = ç”¨æˆ·æ•°æ®æ®µã€‚
+    | |_------------------------^
+    |   |
+    |   rustdoc does not generate documentation for macro invocations
+    |
+    = help: to document an item produced by a macro, the macro must produce the documentation as part of its expansion
+    = note: `#[warn(unused_doc_comments)]` (part of `#[warn(unused)]`) on by default
+
+warning[E0133]: use of inline assembly is unsafe and requires unsafe block
+   --> crates\arch\arch-x86_64\src\percpu.rs:225:5
+    |
+225 |     core::arch::asm!("swapgs", options(nostack, nomem, preserves_flags));
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ use of inline assembly
+    |
+    = note: inline assembly is entirely unchecked and can cause undefined behavior
+note: an unsafe function restricts its caller, but its body is safe by default
+   --> crates\arch\arch-x86_64\src\percpu.rs:224:1
+    |
+224 | pub unsafe fn swapgs() {
+    | ^^^^^^^^^^^^^^^^^^^^^^
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+    = note: `#[warn(unsafe_op_in_unsafe_fn)]` (part of `#[warn(rust_2024_compatibility)]`) on by default
+
+warning[E0133]: use of inline assembly is unsafe and requires unsafe block
+   --> crates\arch\arch-x86_64\src\syscall.rs:124:5
+    |
+124 | /     core::arch::asm!("rdmsr", in("ecx") msr, out("eax") lo, out("edx") hi,
+125 | |         options(nostack, nomem, preserves_flags));
+    | |_________________________________________________^ use of inline assembly
+    |
+    = note: inline assembly is entirely unchecked and can cause undefined behavior
+note: an unsafe function restricts its caller, but its body is safe by default
+   --> crates\arch\arch-x86_64\src\syscall.rs:121:1
+    |
+121 | unsafe fn rdmsr(msr: u32) -> u64 {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning[E0133]: use of inline assembly is unsafe and requires unsafe block
+   --> crates\arch\arch-x86_64\src\syscall.rs:132:5
+    |
+132 | /     core::arch::asm!("wrmsr", in("ecx") msr, in("eax") v as u32, in("edx") (v >> 32) as u32,
+133 | |         options(nostack, nomem, preserves_flags));
+    | |_________________________________________________^ use of inline assembly
+    |
+    = note: inline assembly is entirely unchecked and can cause undefined behavior
+note: an unsafe function restricts its caller, but its body is safe by default
+   --> crates\arch\arch-x86_64\src\syscall.rs:131:1
+    |
+131 | unsafe fn wrmsr(msr: u32, v: u64) {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/unsafe-op-in-unsafe-fn.html>
+
+warning: variable does not need to be mutable
+   --> crates\arch\arch-x86_64\src\syscall.rs:400:9
+    |
+400 |     let mut probe = |nr: u64| -> u64 {
+    |         ----^^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+For more information about this error, try `rustc --explain E0133`.
+warning: `arch-x86_64` (lib) generated 5 warnings (run `cargo fix --lib -p arch-x86_64` to apply 4 suggestions)
+warning: unused import: `AccessPolicy`
+  --> crates\vfs\src\mount.rs:26:20
+   |
+26 | use crate::inode::{AccessPolicy, FileSystem, INode, INodeType};
+   |                    ^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `read`
+  --> crates\vfs\src\stdio.rs:77:20
+   |
+77 | fn stream_metadata(read: bool, write: bool) -> Result<FileMetadata, Error> {
+   |                    ^^^^ help: if this is intentional, prefix it with an underscore: `_read`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `error`
+  --> crates\driver\src\drivers\atapi_cdrom.rs:23:12
+   |
+23 | use klib::{error, info};
+   |            ^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: value assigned to `hi` is never read
+    --> crates\driver\src\drivers\ahci.rs:1198:23
+     |
+1198 |     let mut hi: u64 = u64::MAX;
+     |                       ^^^^^^^^ this value is reassigned later and never used
+...
+1205 |     hi = LBA48_LIMIT - 1;
+     |     -------------------- `hi` is overwritten here before the previous value is read
+     |
+     = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: `vfs` (lib) generated 2 warnings (run `cargo fix --lib -p vfs` to apply 2 suggestions)
+warning: `driver` (lib) generated 2 warnings (run `cargo fix --lib -p driver` to apply 1 suggestion)
+warning: unused import: `alloc::format`
+  --> crates\fs\src\iso9660.rs:15:5
+   |
+15 | use alloc::format;
+   |     ^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> crates\fs\src\ext2.rs:369:13
+    |
+369 |         let mut inner = Ext2Inner {
+    |             ----^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `fs` (lib) generated 2 warnings (run `cargo fix --lib -p fs` to apply 2 suggestions)
+   Compiling kernel v0.1.0 (F:\boruix-project\kernel\crates\kernel)
+warning: function `is_install_mode` is never used
+  --> crates\kernel\src\vfs_init.rs:45:8
+   |
+45 | pub fn is_install_mode() -> bool {
+   |        ^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `kernel` (bin "kernel") generated 1 warning
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.28s
+[tools] ´íÎó: Î´ÕÒµ½ xorriso£¬ÎŞ·¨Éú³É ISO
+[tools] ±àÒëÓÃ»§³ÌĞò (init + libsys)
+[tools] init ELF ÒÑ¸´ÖÆµ½ÄÚºËÔ´ÂëÄ¿Â¼: F:\boruix-project\kernel\crates\kernel\init.elf
+[tools] ±àÒëÓÃ»§³ÌĞò (shell + libsys)
+[tools] shell ELF ÒÑ¸´ÖÆµ½ÄÚºËÔ´ÂëÄ¿Â¼: F:\boruix-project\kernel\crates\kernel\shell.elf
+[tools] ±àÒëÓÃ»§³ÌĞò (volumed + libsys)
+[tools] volumed ELF ÒÑ¸´ÖÆµ½ÄÚºËÔ´ÂëÄ¿Â¼: F:\boruix-project\kernel\crates\kernel\volumed.elf
+[tools] ±àÒëÓÃ»§³ÌĞò (synce2e + libsys)
+[tools] synce2e ELF ÒÑ¸´ÖÆµ½ÄÚºËÔ´ÂëÄ¿Â¼: F:\boruix-project\kernel\crates\kernel\synce2e.elf
+[tools] ±àÒëÓÃ»§³ÌĞò (acee2e + libsys)
+[tools] acee2e ELF ÒÑ¸´ÖÆµ½ÄÚºËÔ´ÂëÄ¿Â¼: F:\boruix-project\kernel\crates\kernel\acee2e.elf
+[tools] ±àÒëÓÃ»§³ÌĞò (trave2e + libsys)
+[tools] trave2e ELF ÒÑ¸´ÖÆµ½ÄÚºËÔ´ÂëÄ¿Â¼: F:\boruix-project\kernel\crates\kernel\trave2e.elf
+[tools] ±àÒëÓÃ»§³ÌĞò (pwde2e + libsys)
+[tools] pwde2e ELF ÒÑ¸´ÖÆµ½ÄÚºËÔ´ÂëÄ¿Â¼: F:\boruix-project\kernel\crates\kernel\pwde2e.elf
+[tools] ±àÒëÓÃ»§³ÌĞò (login + libsys)
+[tools] login ELF ÒÑ¸´ÖÆµ½ÄÚºËÔ´ÂëÄ¿Â¼: F:\boruix-project\kernel\crates\kernel\login.elf
+[tools] ±àÒëÓÃ»§³ÌĞò (fpcheck + libsys)
+[tools] fpcheck ELF ÒÑ¸´ÖÆµ½ÄÚºËÔ´ÂëÄ¿Â¼: F:\boruix-project\kernel\crates\kernel\fpcheck.elf
+[tools] ±àÒëÓÃ»§³ÌĞò (tokendemo + libsys)
+[tools] tokendemo ELF ÒÑ¸´ÖÆµ½ÄÚºËÔ´ÂëÄ¿Â¼: F:\boruix-project\kernel\crates\kernel\tokendemo.elf
+[tools] ±àÒëÓÃ»§³ÌĞò (focusdemo + libsys)
+[tools] focusdemo ELF ÒÑ¸´ÖÆµ½ÄÚºËÔ´ÂëÄ¿Â¼: F:\boruix-project\kernel\crates\kernel\focusdemo.elf
+[tools] ±àÒëÓÃ»§³ÌĞò (spinburn + libsys)
+[tools] spinburn ELF ÒÑ¸´ÖÆµ½ÄÚºËÔ´ÂëÄ¿Â¼: F:\boruix-project\kernel\crates\kernel\spinburn.elf
+[tools] ±àÒëÓÃ»§³ÌĞò (yielder + libsys)
+[tools] yielder ELF ÒÑ¸´ÖÆµ½ÄÚºËÔ´ÂëÄ¿Â¼: F:\boruix-project\kernel\crates\kernel\yielder.elf
+[tools] ±àÒëÓÃ»§³ÌĞò (evdemo + libsys)
+[tools] evdemo ELF ÒÑ¸´ÖÆµ½ÄÚºËÔ´ÂëÄ¿Â¼: F:\boruix-project\kernel\crates\kernel\evdemo.elf
+[tools] ±àÒëÓÃ»§³ÌĞò (evsrcdemo + libsys)
+[tools] evsrcdemo ELF ÒÑ¸´ÖÆµ½ÄÚºËÔ´ÂëÄ¿Â¼: F:\boruix-project\kernel\crates\kernel\evsrcdemo.elf
+[tools] ±àÒëÓÃ»§³ÌĞò (blkdemo + libsys)
+[tools] blkdemo ELF ÒÑ¸´ÖÆµ½ÄÚºËÔ´ÂëÄ¿Â¼: F:\boruix-project\kernel\crates\kernel\blkdemo.elf
+[tools] ±àÒëÓÃ»§³ÌĞò (consoled + libsys)
+[tools] consoled ELF ÒÑ¸´ÖÆµ½ÄÚºËÔ´ÂëÄ¿Â¼: F:\boruix-project\kernel\crates\kernel\consoled.elf
+[tools] ±àÒëÓÃ»§³ÌĞò (consoled-e2e + libsys)
+[tools] consoled-e2e ELF ÒÑ¸´ÖÆµ½ÄÚºËÔ´ÂëÄ¿Â¼: F:\boruix-project\kernel\crates\kernel\consoled-e2e.elf
+[tools] ±àÒëÓÃ»§³ÌĞò (openvt + libsys)
+[tools] openvt ELF ÒÑ¸´ÖÆµ½ÄÚºËÔ´ÂëÄ¿Â¼: F:\boruix-project\kernel\crates\kernel\openvt.elf
+[tools] ±àÒëÓÃ»§³ÌĞò (threaddemo + libsys)
+[tools] threaddemo ELF ÒÑ¸´ÖÆµ½ÄÚºËÔ´ÂëÄ¿Â¼: F:\boruix-project\kernel\crates\kernel\threaddemo.elf
+[tools] ±àÒëÓÃ»§³ÌĞò (userdrv + libsys)
+[tools] userdrv ELF ÒÑ¸´ÖÆµ½ÄÚºËÔ´ÂëÄ¿Â¼: F:\boruix-project\kernel\crates\kernel\userdrv.elf
+[tools] ±àÒëÓÃ»§³ÌĞò (driverd + libsys)
+[tools] driverd ELF ÒÑ¸´ÖÆµ½ÄÚºËÔ´ÂëÄ¿Â¼: F:\boruix-project\kernel\crates\kernel\driverd.elf
+[tools] ±àÒëÓÃ»§³ÌĞò (userd + libsys)
+[tools] userd ELF ÒÑ¸´ÖÆµ½ÄÚºËÔ´ÂëÄ¿Â¼: F:\boruix-project\kernel\crates\kernel\userd.elf
+[tools] ±àÒëÓÃ»§³ÌĞò (intel-hda + libsys)
+[tools] intel-hda ELF ÒÑ¸´ÖÆµ½ÄÚºËÔ´ÂëÄ¿Â¼: F:\boruix-project\kernel\crates\kernel\intel-hda.elf
+[tools] ±àÒëÓÃ»§³ÌĞò (audioe2e + libsys)
+[tools] audioe2e ELF ÒÑ¸´ÖÆµ½ÄÚºËÔ´ÂëÄ¿Â¼: F:\boruix-project\kernel\crates\kernel\audioe2e.elf
+[tools] ±àÒëÓÃ»§³ÌĞò (audiod + libsys)
+[tools] audiod ELF ÒÑ¸´ÖÆµ½ÄÚºËÔ´ÂëÄ¿Â¼: F:\boruix-project\kernel\crates\kernel\audiod.elf
+[tools] ±àÒëÓÃ»§³ÌĞò (audiofile + libsys)
+[tools] audiofile ELF ÒÑ¸´ÖÆµ½ÄÚºËÔ´ÂëÄ¿Â¼: F:\boruix-project\kernel\crates\kernel\audiofile.elf
+[tools] ±àÒëÓÃ»§³ÌĞò (selftest + libsys)
+[tools] selftest ELF ÒÑ¸´ÖÆµ½ÄÚºËÔ´ÂëÄ¿Â¼: F:\boruix-project\kernel\crates\kernel\selftest.elf
+[tools] ±àÒë C ³ÌĞò (chelldemo, freestanding clang/lld)
+[tools] chelldemo ELF ÒÑ¸´ÖÆµ½ÄÚºËÔ´ÂëÄ¿Â¼: F:\boruix-project\kernel\crates\kernel\chelldemo.elf
+[tools] ±àÒë C ³ÌĞò (pthreaddemo, freestanding clang/lld)
+[tools] pthreaddemo ELF ÒÑ¸´ÖÆµ½ÄÚºËÔ´ÂëÄ¿Â¼: F:\boruix-project\kernel\crates\kernel\pthreaddemo.elf
+[tools] ±àÒë C ³ÌĞò (pthread_syncdemo, freestanding clang/lld)
+[tools] pthread_syncdemo ELF ÒÑ¸´ÖÆµ½ÄÚºËÔ´ÂëÄ¿Â¼: F:\boruix-project\kernel\crates\kernel\pthread_syncdemo.elf
+[tools] ±àÒë C ³ÌĞò (pthread_bench, freestanding clang/lld)
+[tools] pthread_bench ELF ÒÑ¸´ÖÆµ½ÄÚºËÔ´ÂëÄ¿Â¼: F:\boruix-project\kernel\crates\kernel\pthread_bench.elf
+[tools] ±àÒë C ³ÌĞò (forkdemo, freestanding clang/lld)
+[tools] forkdemo ELF ÒÑ¸´ÖÆµ½ÄÚºËÔ´ÂëÄ¿Â¼: F:\boruix-project\kernel\crates\kernel\forkdemo.elf
+[tools] ±àÒëÄÚºË (target=x86_64-unknown-none, profile=debug)
+[tools] ·ûºÅ±íÒÑÉú³É: F:\boruix-project\kernel\crates\kernel\src\symbols_generated.rs (8062 ¸ö·ûºÅ)
+[tools] ÖØĞÂ±àÒëÒÔÇ¶Èë·ûºÅ±í ...
+[tools] ÄÚºË ELF: F:\boruix-project\kernel\target\x86_64-unknown-none\debug\kernel
