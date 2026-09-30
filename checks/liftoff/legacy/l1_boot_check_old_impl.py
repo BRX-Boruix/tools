@@ -1,3 +1,8 @@
+# 【已归档：面向旧实现】
+# 本检查的锚点（如 [boot] liveCD mode、init: loaded）属于旧实现，
+# 不适用于 gen2（gen2 的端到端判定见 l3_gen2_entry_check.py）。
+# 保留仅供回溯旧实现之用，不在闸门里运行。
+
 #!/usr/bin/env python3
 """liftoff（UEFI/OVMF）端到端验收。
 
