@@ -1,11 +1,14 @@
-tools: --liftoff 跳过 BIOS 专属步骤（摆脱交叉工具链依赖）
+checks/tools: b2 支持 --liftoff（UEFI 路径）+ xorriso 从 MSYS2 解析
 
-- _make_iso / _make_system_disk 增加 liftoff_only：跳过 brxLimine fork 产物拷贝、
-  El Torito "-b" 引导项、isohybrid MBR 写入、以及 EXT2 上的 BIOS 引导码安装；
-  理由：liftoff 走 UEFI/OVMF，读的是文件系统里的文件（/boot/kernel、/programs），
-  与 BIOS 引导码无关 → 该链路不再需要 i686-elf 交叉工具链；
-- 实测：python main.py build --systemdisk --liftoff → exit=0（本机既无 xorriso
-  也无 brxLimine fork 产物），产出 systemdisk.img 并顺带摆好 ESP；
-- 端到端：checks/liftoff/l1_boot_check.py --medium systemdisk → 6 锚全过
-  （含 [kmain] init: loaded 与 [kmain] init: spawned pid=1 from init.elf）；
-- 边界：ISO 链仍需 xorriso（本机未安装），--medium iso 未在本机实测。
+- config.py：新增 XORRISO 单点解析（PATH → 项目自备 MSYS2 的 usr/bin → ffmpeg）；
+  build.py 改为只读该常量。本机 xorriso 实测位于
+  envfiles/msys2/msys64/usr/bin/xorriso.exe —— 此前 build --liftoff 报 exit=1 无输出
+  就是因为 PATH 里没有它；
+- checks/boot/b2_systemdisk_check.py：加 --liftoff（OVMF + ESP + 同一张系统盘，
+  断言不变）与 --s1-timeout（UEFI 路径多一层 OVMF 初始化、内核装载更慢，默认 150s 不够）；
+- 实测：python main.py build --liftoff 现在 exit=0，产出 boruix.iso（26,275,840 B，
+  含 /programs）并摆好 ESP —— 且不需要任何 brxLimine BIOS 产物；
+- 实测（重要，负面）：b2 --liftoff --s1-timeout 420 → FAIL "no login prompt"。
+  串口显示内核走到 [kmain] init: spawned pid=1 from init.elf 之后**再无任何输出**
+  （日志 11246 B，spawn 在 11217）。同一张盘在 BIOS/brxLimine 路径可达登录。
+  → liftoff 下「PID 1 被创建」之后的推进尚未打通，这是"OS 完整可用"的当前缺口。

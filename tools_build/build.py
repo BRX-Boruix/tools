@@ -192,7 +192,7 @@ def _make_iso(profile: str = "debug", liftoff_only: bool = False) -> int:
             return 1
         shutil.copy(elf, os.path.join(prog_dir, name + ".elf"))
 
-    xorriso = shutil.which("xorriso") or r"C:\ffmpeg\bin\xorriso.exe"
+    xorriso = config.XORRISO
     if not os.path.isfile(xorriso):
         err("未找到 xorriso，无法生成 ISO")
         return 1

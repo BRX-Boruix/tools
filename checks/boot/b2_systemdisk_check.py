@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
-import os, socket, subprocess, sys, time
-import sys
+"""B2 系统盘验收：EXT2 系统盘 → 登录 → BORUIX shell → 从盘上 exec 程序（S1/S2/S3）。
+
+默认走 BIOS + brxLimine（-hda）；--liftoff 走 UEFI + liftoff（OVMF + ESP + 同一张盘），
+断言完全相同——这正是「liftoff 下 OS 是否完整可用」的验收。
+"""
+import argparse, os, socket, subprocess, sys, time
 # --- tools path bootstrap (files live under tools/checks/<cat>/) ---
 _TOOLS_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if _TOOLS_DIR not in sys.path:
     sys.path.insert(0, _TOOLS_DIR)
-from tools_build import config
+from tools_build import config, liftoff
 
 ROOT = r"F:\boruix-project"
 QEMU = os.path.join(ROOT, "envfiles", "tools", "qemu-stable", "qemu-9.2.0-win64", "qemu-system-x86_64.exe")
@@ -14,12 +18,25 @@ LOG = os.path.join(ROOT, "_b2_sysdisk_serial.log")
 PORT = 45482
 
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--liftoff", action="store_true",
+                    help="用 liftoff(UEFI/OVMF) 引导而非 brxLimine(BIOS)")
+    # UEFI 路径多一层 OVMF 固件初始化，且 24.6MB 内核的读取/装载在 TCG 下更慢——
+    # S1（登录提示）超时按链路可调，BIOS 路径沿用 150s。
+    ap.add_argument("--s1-timeout", type=int, default=150)
+    args = ap.parse_args()
     if os.path.exists(LOG):
         os.remove(LOG)
-    qemu = [QEMU, "-hda", SDISK, "-boot", "order=c", "-m", "256",
-            "-display", "none", "-serial", "file:" + LOG,
-            "-monitor", "tcp:127.0.0.1:%d,server,nowait" % PORT, "-no-reboot"]
-    print("[sysdisk] boot from EXT2 systemdisk (no ISO, no data disk)")
+    common = ["-m", "256", "-display", "none", "-serial", "file:" + LOG,
+              "-monitor", "tcp:127.0.0.1:%d,server,nowait" % PORT, "-no-reboot"]
+    if args.liftoff:
+        esp = liftoff.ensure_ready()
+        qemu = [liftoff.qemu_exe()] + common + [
+            "-drive", "format=raw,file=" + SDISK] + liftoff.uefi_args(esp)
+        print("[sysdisk] boot from EXT2 systemdisk via liftoff (UEFI/OVMF), esp=" + esp)
+    else:
+        qemu = [QEMU, "-hda", SDISK, "-boot", "order=c"] + common
+        print("[sysdisk] boot from EXT2 systemdisk (no ISO, no data disk)")
     proc = subprocess.Popen(qemu, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     s = None
     for _ in range(60):
@@ -62,7 +79,7 @@ def main():
         return None
 
     ok = True
-    if wait_log("username:", 150) is None:
+    if wait_log("username:", args.s1_timeout) is None:
         print("[sysdisk] FAIL: no login prompt")
         proc.kill()
         return 1

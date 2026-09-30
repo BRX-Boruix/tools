@@ -4,6 +4,7 @@
 """
 
 import os
+import shutil
 
 # 路径
 TOOLS_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -100,3 +101,20 @@ def load_env() -> dict:
 _ENV = load_env()
 I686_ELF_GCC_DIR = _ENV.get("I686_ELF_GCC_DIR") or os.path.join(ENVFILES_DIR, "i686-elf-tools")
 I686_ELF_GCC = os.path.join(I686_ELF_GCC_DIR, "bin", "i686-elf-gcc.exe")
+
+# xorriso（生成 ISO 的组装器）：PATH → 项目自备 MSYS2 → ffmpeg 附带。
+# 单一真值（S15）：build.py 只读本常量，不各自 which。
+def _find_xorriso() -> str:
+    found = shutil.which("xorriso")
+    if found:
+        return found
+    msys2 = _ENV.get("MSYS2_DIR")
+    if msys2:
+        p = os.path.join(msys2, "usr", "bin", "xorriso.exe")
+        if os.path.isfile(p):
+            return p
+    ff = os.path.join("C:\\", "ffmpeg", "bin", "xorriso.exe")
+    return ff if os.path.isfile(ff) else "xorriso"
+
+
+XORRISO = _find_xorriso()
