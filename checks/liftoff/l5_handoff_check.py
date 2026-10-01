@@ -9,7 +9,13 @@ ISO9660 上的 `/boot/kernel` -> 内核 -> 用户态 `init` 及其守护进程 -
 `exit_prepared` 取 `map_key`、覆盖检查、跳板交付的机器状态、以及内核能加载并运行
 用户态。任何一环坏了，`username:` 都不会出现。
 
-**与 l3 的差别不只是标记串**：到 `username:` 必须真的挂上 ISO 与声卡，因为
+**串口通道用 `-serial stdio`，不用 `-serial file:`。** QEMU 的 file 后端不在每次写入
+时刷新（`checks/interactive/l3_interactive.py` 记录了实测：静止 16 秒文件大小不变），
+落盘时机取决于内部缓冲——属未定义行为。运行期轮询它，等于把判定的正确性押在一个
+未文档化的缓冲策略上：输出多到填满缓冲就「恰好能用」，输出少就永远读不到。`stdio`
+由本进程实时读走，时序确定。
+
+到 `username:` 必须真的挂上 ISO 与声卡：
 * ISO 必须以 `-cdrom` 挂（内核找的是 CD 设备；挂成硬盘时 `/programs` 为空，
   `init.elf` 加载不了，内核只能进 idle loop）；
 * 声卡参数必须给（`intel-hda` + `hda-output`），否则用户态 `intel-hda` 驱动
@@ -20,7 +26,6 @@ ISO9660 上的 `/boot/kernel` -> 内核 -> 用户态 `init` 及其守护进程 -
 """
 
 import os
-import subprocess
 import sys
 
 TOOLS_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -30,10 +35,8 @@ from tools_build import config, liftoff, qemu_debug  # noqa: E402
 
 MARKER = b"username:"
 # 内核映像有 24MB，从 ISO 读进来本身就要两分多钟（真机实测约 140 秒），再加内核与
-# 用户态启动。给足余量，宁可等，不要因为超时把真实通过判成失败。
+# 用户态启动。给足余量：宁可等，不要因为超时把真实通过判成失败。
 TIMEOUT_S = 600
-# 串口日志落到工作区根（与 l3 同一约定），且以 `_` 开头，不会进仓库。
-LOG_NAME = "_pre2_l5_serial.log"
 
 
 def main() -> int:
@@ -42,37 +45,32 @@ def main() -> int:
         return 1
     qemu_debug.kill_existing()
     esp = liftoff.ensure_ready()
-    log = os.path.join(TOOLS_ROOT, LOG_NAME)
-    if os.path.exists(log):
-        os.remove(log)
     cmd = ([liftoff.qemu_exe(), "-m", "1024", "-smp", "1", "-display", "none",
-            "-serial", "file:" + log, "-cdrom", config.OUTPUT_ISO]
+            "-serial", "stdio", "-cdrom", config.OUTPUT_ISO]
            + config.sound_card_args(silent=True)
            + liftoff.uefi_args(esp))
     print("[pre2-l5] ISO: " + config.OUTPUT_ISO)
     print("[pre2-l5] ESP: " + esp)
     print("[pre2-l5] 等待标记: " + MARKER.decode())
-    proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    capture = qemu_debug.SerialCapture(cmd)
     try:
-        seen = qemu_debug.wait_for_serial(log, MARKER, TIMEOUT_S, process=proc)
+        seen = capture.wait_for(MARKER, TIMEOUT_S)
     finally:
-        # 必须用 taskkill：Windows 上 QEMU 不随父进程退出，`terminate()` 常杀不掉，
-        # 残留进程会占住 `fat:rw:` 的 ESP 目录，让下一次运行失败（实测多次）。
-        qemu_debug.kill_existing(timeout_s=2.0)
-    text = b""
-    if os.path.isfile(log):
-        with open(log, "rb") as handle:
-            text = handle.read()
+        # 必须用 taskkill：Windows 上 QEMU 不随父进程退出，残留进程会占住
+        # `fat:rw:` 的 ESP 目录，让下一次运行失败（实测多次）。
+        capture.close()
+    text = capture.buffer.text()
     if seen:
-        print("PASS: 串口出现 %s（%d 字节）" % (MARKER.decode(), len(text)))
+        print("PASS: 串口出现 %s（%d 字节）" % (MARKER.decode(), len(capture.buffer)))
         return 0
-    print("FAIL: %d 秒内未出现 %s（串口 %d 字节）" % (TIMEOUT_S, MARKER.decode(), len(text)))
+    print("FAIL: %d 秒内未出现 %s（串口 %d 字节）" % (
+        TIMEOUT_S, MARKER.decode(), len(capture.buffer)))
     print("== 常见原因 ==")
     print("  * 内核在 mm::init panic -> 某个响应没送到（查 `Failed to get HHDM response`）")
     print("  * 只到 `reached idle loop` -> ISO 没以 -cdrom 挂，/programs 为空")
     print("  * 用户态分配器 panic -> 声卡参数缺失，intel-hda 探测不到设备")
     print("== serial tail ==")
-    print(text[-2000:].decode("utf-8", "replace"))
+    print(text[-2000:])
     return 1
 
 

@@ -62,6 +62,42 @@ def _check_ppm_to_png() -> None:
     print("  PPM->PNG: %dx%d 往返逐字节相同，chunk CRC 全对" % (width, height))
 
 
+def _check_serial_buffer() -> None:
+    """`SerialBuffer` 的边界：标记跨块、标记在尾、空输入、多次喂入。
+
+    这几条是**真实**会踩的坑：串口数据按块到达，一个标记极可能被切成两块
+    （`...userna` + `me:...`）。朴素实现「每块各自 find」就会漏掉它。
+    """
+    # 标记完整落在一块里。
+    buf = qemu_debug.SerialBuffer()
+    buf.feed(b"hello username: world")
+    if not buf.contains(b"username:"):
+        raise AssertionError("整块内的标记未被识别")
+    # 标记被切成两块——这是关键用例。
+    split = qemu_debug.SerialBuffer()
+    split.feed(b"hello userna")
+    if split.contains(b"username:"):
+        raise AssertionError("不完整的前缀不应被判为命中")
+    split.feed(b"me: world")
+    if not split.contains(b"username:"):
+        raise AssertionError("跨块标记未被识别（朴素实现会漏）")
+    # 空输入不命中，也不崩。
+    empty = qemu_debug.SerialBuffer()
+    if empty.contains(b"username:"):
+        raise AssertionError("空缓冲不应命中")
+    if empty.text() != "":
+        raise AssertionError("空缓冲的文本应为空字符串")
+    # 文本与行数按喂入顺序累积。
+    lines = qemu_debug.SerialBuffer()
+    lines.feed(b"a\nb\n")
+    lines.feed(b"c")
+    if lines.text() != "a\nb\nc":
+        raise AssertionError("文本累积不符: %r" % lines.text())
+    if lines.line_count() != 2:
+        raise AssertionError("行数应为 2（未换行的尾部不算一行），实得 %d" % lines.line_count())
+    print("  SerialBuffer: 跨块标记/空输入/累积 共 8 项断言通过")
+
+
 def _check_malformed_rejected() -> None:
     # 非 P6、非 8 位、像素不足：三种畸形都必须抛错，不得返回「看起来能用」的 PNG。
     bad_inputs = [
@@ -82,7 +118,8 @@ def main() -> int:
     failures = []
     for name, fn in (("RSP 校验和", _check_checksums),
                      ("PPM->PNG", _check_ppm_to_png),
-                     ("畸形输入拒绝", _check_malformed_rejected)):
+                     ("畸形输入拒绝", _check_malformed_rejected),
+                     ("SerialBuffer 边界", _check_serial_buffer)):
         try:
             fn()
         except AssertionError as exc:

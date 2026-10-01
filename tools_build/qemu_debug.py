@@ -20,6 +20,7 @@ import socket
 import struct
 import subprocess
 import sys
+import threading
 import time
 import zlib
 
@@ -252,40 +253,127 @@ def ppm_to_png(ppm: bytes) -> bytes:
             + chunk(b"IEND", b""))
 
 
-def wait_for_serial(log_path: str, marker: bytes, deadline_s: float, poll_s: float = 2.0,
-                    process=None) -> bool:
-    """轮询串口日志直到出现 `marker`；QEMU 提前退出则立即返回 False。"""
-    deadline = time.monotonic() + deadline_s
-    while time.monotonic() < deadline:
-        if os.path.isfile(log_path):
-            with open(log_path, "rb") as fh:
-                if marker in fh.read():
-                    return True
-        if process is not None and process.poll() is not None:
-            return False
-        time.sleep(poll_s)
-    return False
+class SerialBuffer:
+    """串口字节流累积器。
+
+    **为什么不能对每块单独查标记**：串口数据按块到达，一个标记极可能被切成两块
+    （`...userna` + `me:...`）。朴素实现「每块各自 find」会漏掉它，于是检查偶发
+    超时——这种失败最难查，因为它取决于分块时机。
+    """
+
+    __slots__ = ("_data",)
+
+    def __init__(self):
+        self._data = bytearray()
+
+    def feed(self, chunk: bytes) -> None:
+        self._data.extend(chunk)
+
+    def contains(self, marker: bytes) -> bool:
+        return marker in self._data
+
+    def text(self) -> str:
+        # 串口输出是 UTF-8；边界处的半个字符用替换字符表示，不抛异常（S02）。
+        return bytes(self._data).decode("utf-8", errors="replace")
+
+    def line_count(self) -> int:
+        # 直接数换行字节：解码后再数会被多字节字符与替换字符干扰。
+        return self._data.count(0x0A)
+
+    def __len__(self) -> int:
+        return len(self._data)
 
 
-def wait_for_serial_quiet(log_path: str, deadline_s: float, quiet_s: float = 25.0,
-                          poll_s: float = 5.0, process=None):
-    """等串口日志停止增长（内核停机或进入空闲），返回读到的原始字节。"""
-    deadline = time.monotonic() + deadline_s
-    last = -1
-    stable = 0.0
-    while time.monotonic() < deadline:
-        time.sleep(poll_s)
-        size = os.path.getsize(log_path) if os.path.isfile(log_path) else 0
-        if size > 0 and size == last:
-            stable += poll_s
-            if stable >= quiet_s:
-                break
-        else:
-            stable = 0.0
-        last = size
-        if process is not None and process.poll() is not None:
-            break
-    if not os.path.isfile(log_path):
-        return b""
-    with open(log_path, "rb") as fh:
-        return fh.read()
+class SerialCapture:
+    """用 `-serial stdio` 启动 QEMU 并**实时**收集串口输出。
+
+    为什么不用 `-serial file:`：QEMU 的 file 后端不在每次写入时刷新（仓库里
+    `checks/interactive/l3_interactive.py` 记录了实测：静止 16 秒文件大小不变），
+    落盘时机取决于内部缓冲——属未定义行为。依赖它的检查会随输出量大小而时灵时不灵：
+    输出多到填满缓冲就「恰好能用」，输出少就永远读不到。`stdio` 由本进程实时读走，
+    时序确定。
+
+    调用方给出完整命令行；本类只管进程生命周期与字节流。
+    """
+
+    def __init__(self, command):
+        self._process = subprocess.Popen(
+            command, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        self._buffer = SerialBuffer()
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._reader, daemon=True)
+        self._thread.start()
+
+    @property
+    def buffer(self) -> SerialBuffer:
+        return self._buffer
+
+    @property
+    def process(self):
+        return self._process
+
+    def _reader(self) -> None:
+        try:
+            while not self._stop.is_set():
+                # **必须用 `read1` 而不是 `read`。** 管道上的 `read(n)` 会阻塞到
+                # **读满 n 字节**（或 EOF）才返回，于是缓冲只按 n 的整数倍前进：
+                # 末尾不满一块的标记要等到下一块填满才可见，输出一慢就拖到超时。
+                # 实测代价：一次 `-serial stdio` 的 L5 检查因此 600 秒超时，而
+                # 标记其实早在最终缓冲里（15338 字节）。`read1` 有数据就返回。
+                chunk = self._process.stdout.read1(4096)
+                if not chunk:
+                    return
+                self._buffer.feed(chunk)
+        except (ValueError, OSError):
+            # 收尾时关闭管道会让阻塞中的 read 抛错；这是正常收尾路径，不是失败。
+            return
+
+    def wait_for(self, marker: bytes, timeout_s: float, poll_s: float = 0.5) -> bool:
+        """等 `marker` 出现；超时返回 False，**不假装成功**。"""
+        deadline = time.monotonic() + timeout_s
+        while time.monotonic() < deadline:
+            if self._buffer.contains(marker):
+                return True
+            if self._process.poll() is not None:
+                # QEMU 已退出：给它一点时间交出剩余输出，再定论。
+                self._thread.join(timeout=3.0)
+                return self._buffer.contains(marker)
+            time.sleep(poll_s)
+        return self._buffer.contains(marker)
+
+    def wait_quiet(self, timeout_s: float, quiet_s: float = 20.0,
+                   poll_s: float = 1.0) -> None:
+        """等到连续 `quiet_s` 秒没有新输出（内核停机或进入空闲）。"""
+        deadline = time.monotonic() + timeout_s
+        last = len(self._buffer)
+        stable = 0.0
+        while time.monotonic() < deadline:
+            time.sleep(poll_s)
+            size = len(self._buffer)
+            if size == last:
+                stable += poll_s
+                if stable >= quiet_s:
+                    return
+            else:
+                stable = 0.0
+            last = size
+            if self._process.poll() is not None:
+                return
+
+    def close(self) -> None:
+        """停掉 QEMU 与读线程。用 taskkill：Windows 上 QEMU 不随父进程退出。"""
+        self._stop.set()
+        kill_existing(timeout_s=2.0)
+        self._thread.join(timeout=5.0)
+        if self._process.stdout is not None:
+            try:
+                self._process.stdout.close()
+            except OSError:
+                pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_exc):
+        self.close()
+        return False
