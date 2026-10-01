@@ -77,6 +77,8 @@ class RspClient:
         这样测试走的是与真机完全相同的收发代码路径，不需要 mock。
         """
         self._sock = sock
+        # 诊断钩子：设为可调用对象就打印原始收发帧。排查协议问题用，默认关。
+        self.trace = None
 
     @classmethod
     def connect(cls, host: str = "127.0.0.1", port: int = DEFAULT_GDB_PORT,
@@ -98,7 +100,10 @@ class RspClient:
 
     def _send(self, body: str) -> None:
         payload = body.encode("ascii")
-        self._sock.sendall(b"$" + payload + b"#" + rsp_checksum(payload))
+        frame = b"$" + payload + b"#" + rsp_checksum(payload)
+        if self.trace:
+            self.trace("%7.2fs >> %s" % (time.monotonic() % 1000, frame.decode("ascii", "replace")))
+        self._sock.sendall(frame)
 
     def _recv_packet(self, timeout: float = None):
         """收到一个 `$...#xx` 包并回 `+`；超时返回 `None`。"""
@@ -124,6 +129,8 @@ class RspClient:
                 if ch == b"#":
                     self._sock.recv(2)  # 校验和，QEMU 不校验，这里也不假装校验
                     self._sock.sendall(b"+")
+                    if self.trace:
+                        self.trace("%7.2fs << %s" % (time.monotonic() % 1000, body.decode("ascii", "replace")))
                     return body
                 body += ch
                 if len(body) > RSP_MAX_PACKET:
@@ -149,10 +156,13 @@ class RspClient:
         reply = self.command("Z0,%x,%d" % (address, kind))
         return reply == b"OK"
 
-    def continue_(self, timeout: float = None):
-        """`c`：继续执行；返回停机原因包（`T..` / `S..`），超时返回 `None`。"""
+    def continue_(self) -> None:
+        """`c`：让 VM 继续执行。**不读应答**。
+
+        停机包要等断点命中（可能几分钟后）才来，读它属于 `wait_for_stop` 的职责。
+        在这里顺手读一次应答，会把停机包**读走又丢掉**——调用方再等就什么都没有了。
+        """
         self._send("c")
-        return self._recv_packet(timeout=timeout)
 
     def wait_for_stop(self, timeout_s: float):
         """等一个停机包（`T..` / `S..`），返回它；超时返回 `None`。
@@ -172,9 +182,10 @@ class RspClient:
                 return packet
 
     def step(self, timeout: float = 20.0):
-        """`s`：单步一条指令。"""
+        """`s`：单步一条指令，返回停机包（可能带非停机包前缀，调用方自行判断）。"""
         self._send("s")
-        return self._recv_packet(timeout=timeout)
+        # 与 `continue_` 同理：应答可能先来一个非停机包（`O`），不能只读一次。
+        return self.wait_for_stop(timeout)
 
     def read_memory(self, address: int, length: int) -> bytes:
         """`m addr,len`：读内存。返回真实字节，长度不符即报错。"""
