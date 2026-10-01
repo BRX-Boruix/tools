@@ -93,6 +93,8 @@ def main() -> int:
                         help="单格模式的核数（默认 1）")
     parser.add_argument("--cpu", default=None, choices=("max",),
                         help="单格模式的 CPU 模型（缺省即 QEMU 默认模型）")
+    parser.add_argument("--dump-serial", default=None, metavar="PATH",
+                        help="把每格的串口输出写到该文件（留证；多格时追加并标注格子）")
     args = parser.parse_args()
 
     if not os.path.isfile(config.OUTPUT_ISO):
@@ -115,6 +117,10 @@ def main() -> int:
     for smp, cpu_args, desc in cells:
         print("-- 格子: " + desc + " --")
         seen, text = run_cell(esp, smp, cpu_args)
+        if args.dump_serial:
+            with open(args.dump_serial, "a", encoding="utf-8") as handle:
+                handle.write("\n===== %s =====\n" % desc)
+                handle.write(text)
         if seen:
             print("  PASS: " + desc + "（%d 字节）" % len(text))
             continue
