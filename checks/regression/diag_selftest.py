@@ -98,6 +98,37 @@ def _check_serial_buffer() -> None:
     print("  SerialBuffer: 跨块标记/空输入/累积 共 8 项断言通过")
 
 
+def _check_rsp_wait_for_stop() -> None:
+    """用**真实 socketpair** 喂真实 RSP 包，验证停机包识别。
+
+    不用 mock：socketpair 是真实双向通道，客户端走的是与真机同一条代码路径。
+    要覆盖的两点都是真机会遇到的：内核运行期间会插入非停机包（`O` 等），
+    以及「一直没有停机包」时必须返回 None 而不是假装成功。
+    """
+    import socket as _socket
+
+    left, right = _socket.socketpair()
+    try:
+        client = qemu_debug.RspClient(left)
+
+        def packet(body: bytes) -> bytes:
+            return b"$" + body + b"#" + qemu_debug.rsp_checksum(body)
+
+        # 先一个非停机包，再一个停机包；客户端必须跳过前者、返回后者。
+        right.sendall(packet(b"O"))
+        right.sendall(packet(b"T05"))
+        stop = client.wait_for_stop(5.0)
+        if stop != b"T05":
+            raise AssertionError("wait_for_stop 应返回 T05，实得 %r" % stop)
+        # 没有停机包时超时必须返回 None（不假装成功）。
+        if client.wait_for_stop(0.5) is not None:
+            raise AssertionError("无停机包时 wait_for_stop 应返回 None")
+    finally:
+        left.close()
+        right.close()
+    print("  RspClient.wait_for_stop: 跳过非停机包 / 识别 T05 / 超时返回 None")
+
+
 def _check_malformed_rejected() -> None:
     # 非 P6、非 8 位、像素不足：三种畸形都必须抛错，不得返回「看起来能用」的 PNG。
     bad_inputs = [
@@ -119,7 +150,8 @@ def main() -> int:
     for name, fn in (("RSP 校验和", _check_checksums),
                      ("PPM->PNG", _check_ppm_to_png),
                      ("畸形输入拒绝", _check_malformed_rejected),
-                     ("SerialBuffer 边界", _check_serial_buffer)):
+                     ("SerialBuffer 边界", _check_serial_buffer),
+                     ("RSP 停机包等待", _check_rsp_wait_for_stop)):
         try:
             fn()
         except AssertionError as exc:

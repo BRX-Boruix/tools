@@ -70,9 +70,21 @@ def rsp_checksum(payload: bytes) -> bytes:
 class RspClient:
     """GDB 远程串行协议的最小客户端（只实现诊断需要的命令）。"""
 
-    def __init__(self, host: str = "127.0.0.1", port: int = DEFAULT_GDB_PORT, timeout: float = 20.0):
-        self._sock = socket.create_connection((host, port), timeout=timeout)
-        self._sock.settimeout(timeout)
+    def __init__(self, sock):
+        """接一个**已连接**的 socket。
+
+        真机走 `RspClient.connect()`；测试用 `socket.socketpair()` 注入——
+        这样测试走的是与真机完全相同的收发代码路径，不需要 mock。
+        """
+        self._sock = sock
+
+    @classmethod
+    def connect(cls, host: str = "127.0.0.1", port: int = DEFAULT_GDB_PORT,
+                timeout: float = 20.0):
+        """连到 QEMU 的 gdbstub（`-s` 等价于 `-gdb tcp::1234`）。"""
+        sock = socket.create_connection((host, port), timeout=timeout)
+        sock.settimeout(timeout)
+        return cls(sock)
 
     def close(self) -> None:
         self._sock.close()
@@ -141,6 +153,23 @@ class RspClient:
         """`c`：继续执行；返回停机原因包（`T..` / `S..`），超时返回 `None`。"""
         self._send("c")
         return self._recv_packet(timeout=timeout)
+
+    def wait_for_stop(self, timeout_s: float):
+        """等一个停机包（`T..` / `S..`），返回它；超时返回 `None`。
+
+        内核运行期间 gdbstub 会插入非停机包（`O` 控制台输出等），必须跳过；
+        每轮只等一小段，这样超时是**确定的**而不是被一个长阻塞吞掉。
+        """
+        deadline = time.monotonic() + timeout_s
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return None
+            packet = self._recv_packet(timeout=min(remaining, 5.0))
+            if packet is None:
+                continue
+            if packet[:1] in (b"T", b"S"):
+                return packet
 
     def step(self, timeout: float = 20.0):
         """`s`：单步一条指令。"""
