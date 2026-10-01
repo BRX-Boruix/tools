@@ -1,3 +1,4 @@
+# 构建输出
 /target
 Cargo.lock
 /build
@@ -16,41 +17,13 @@ __pycache__/
 # 归档的 aarch64 固件（二进制，不提交；README 和脚本保留）
 /archived/aarch64/firmware/
 
-
 # 大体积音频测试素材（45MB wav，本地测试用，不提交；小体积 tone-*.wav 已入库）
 /diskfiles/nggyumix.wav
 
 # b3p 第三方程序的编译产物（由 `main.py b3p` 生成，属构建输出非源码）
 /diskfiles/3p/*.elf
 
-# 交互验收脚本的串口抓取与临时产物（本地诊断用，不提交）
-l*_serial.txt
-_l*_serial.log
-_selftest_qemu.log
-ctrl_c_run_*.txt
-yield_run_*.txt
-_p*.txt
-_p*.py
-_l4neg.py
-# I-EVENTS 阶段 2 验收证据/临时产物
-_evdemo_serial.txt
-_evbusy_serial.txt
-_evcpu_serial.txt
-_evcpu2_serial.txt
-_idlecpu_serial.txt
-_cmp_*.txt
-_spin_serial.txt
-_rip_serial.txt
-_grow_serial.txt
-_val_serial.txt
-_stat_serial.txt
-_clean_serial.txt
-_sym.py
-_dis.py
-_diag_serial.txt
-_diag2_serial.txt
-_cat_serial.txt
-_samp_serial.txt
-_iso_*.txt
-_own_*.txt
-_eq_*.txt
+# 根目录下以 `_` 开头的临时诊断脚本与串口/日志产物，一律不提交。
+# 单一规则取代此前逐次追加的特例清单（S13：语义常量单点定义；S06：不留临时物）。
+# 需要长期保留的诊断能力必须沉淀为 tools_build/ 或 checks/ 下的正式模块。
+/_*
