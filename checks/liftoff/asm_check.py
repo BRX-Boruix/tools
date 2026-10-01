@@ -42,11 +42,11 @@ REQUIRED = {
 # 必须按此顺序出现的指令序列 -> 说明。
 SEQUENCES = [
     (
-        r"movl\s+0x2c\(%rsp\), %ebx[\s\S]{0,120}?"
+        r"movl\s+0x30\(%rsp\), %ebx[\s\S]{0,120}?"
         r"pushq\s+\$0x28[\s\S]{0,80}?"
         r"pushq\s+%rbx[\s\S]{0,80}?"
         r"lretl",
-        "32->64 过渡：从参数帧槽 11 取绝对地址再 retf（不得用标签差值）",
+        "32->64 过渡：从参数帧槽 11（[esp+48]，call 压了 4 字节）取绝对地址再 retf",
     ),
     (
         r"pushq\s+\$0x18[\s\S]{0,80}?"
