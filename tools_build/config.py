@@ -13,6 +13,11 @@ KERNEL_DIR = os.path.join(PROJECT_ROOT, "kernel")
 LIMINE_CONF = os.path.join(TOOLS_DIR, "limine.conf")
 ENV_FILE = os.path.join(PROJECT_ROOT, ".env")
 
+# ISO 里内核 ELF 的路径分量。引导器按 ISO9660 读的是同一份；诊断工具必须**按路径查**，
+# 不能写死逻辑块号——那是某一次构建的实测值，ISO 一变就静默指向错误位置（S13/S15：
+# 单点定义，且语义常量不散落在调用方）。
+KERNEL_ISO_COMPONENTS = ("boot", "kernel")
+
 # 构建目标（当前仅 x86_64）
 TARGET = "x86_64-unknown-none"
 QEMU = "qemu-system-x86_64"

@@ -15,13 +15,16 @@ import time
 TOOLS_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, TOOLS_ROOT)
 
-from tools_build import liftoff  # noqa: E402
+from tools_build import liftoff, qemu_debug  # noqa: E402
 
 MARKER = b"[liftoff] gen2 up"
 TIMEOUT_S = 60
 
 
 def main() -> int:
+    # 先清残留：Windows 上 QEMU 不随父进程退出，残留进程会占住 `fat:rw:` 的 ESP
+    # 目录，让本次运行直接失败（不是偶发，是必然）。
+    qemu_debug.kill_existing()
     esp = liftoff.ensure_ready()
     log = os.path.join(TOOLS_ROOT, '_pre2_serial.log')
     if os.path.exists(log):
@@ -41,11 +44,9 @@ def main() -> int:
         if proc.poll() is not None:
             break
         time.sleep(1)
-    proc.terminate()
-    try:
-        proc.wait(timeout=10)
-    except subprocess.TimeoutExpired:
-        proc.kill()
+    # 用 taskkill 而不是 terminate()：后者在 Windows 上杀不掉 QEMU，会留下
+    # 占住 ESP 目录的僵尸进程。
+    qemu_debug.kill_existing(timeout_s=2.0)
     tail = b''
     if os.path.exists(log):
         with open(log, 'rb') as handle:

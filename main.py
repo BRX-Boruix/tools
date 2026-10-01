@@ -17,7 +17,7 @@ BORUIX 系统工具统一入口（系统集成、构建与验收）。
 import argparse
 import sys
 
-from tools_build import b3p, br, build, disk, limine_build, run
+from tools_build import b3p, br, build, disk, elf_image, limine_build, run
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -393,6 +393,35 @@ def build_parser() -> argparse.ArgumentParser:
         help="只列出第三方程序清单，不构建",
     )
     p_b3p.set_defaults(func=b3p.cmd)
+
+    # where 子命令：把内核 ELF 里的地址反解成 `模块::路径::函数+偏移`（诊断用）。
+    #
+    # 存在的理由：内核 panic / 异常只给出 RIP 与 CR2，没有符号反解就只能靠猜。
+    # L5 的最后一层缺陷正是靠它从「某个地址出错」变成「哪条路径出错」
+    # （`arch_x86_64::smp::requested_cpu_count` 读 `0x3de16680`——引导器响应容器的裸地址）。
+    p_where = sub.add_parser(
+        "where",
+        help="把内核 ELF 里的地址反解成符号（诊断）",
+    )
+    p_where.add_argument(
+        "addresses",
+        nargs="*",
+        type=lambda text: int(text, 0),
+        metavar="ADDR",
+        help="待反解的地址（接受 0x 前缀）；不给出则只打印映像概况",
+    )
+    p_where.add_argument(
+        "--iso",
+        default=None,
+        help="ISO 路径（默认 config.OUTPUT_ISO，即构建产物）",
+    )
+    p_where.add_argument(
+        "--sections",
+        action="store_true",
+        dest="list_sections",
+        help="改为列出全部节名",
+    )
+    p_where.set_defaults(func=elf_image.cmd)
 
     return parser
 
