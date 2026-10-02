@@ -294,6 +294,7 @@ USER_PROGRAMS = (
     "audiod",
     "audiofile",
     "selftest",
+    "tlsdemo",
 )
 
 def _build_userspace() -> int:
