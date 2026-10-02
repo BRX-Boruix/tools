@@ -32,6 +32,7 @@ main() 与退出码，单独调用。是否要一个聚合入口（main.py check
 | **PRE-3** | `../regression/check_arch_isolation.py` | 静态隔离：抽象层不得出现实现层依赖；并强制 workspace 成员显式归类 |
 | **PRE-3** | `../regression/check_catalog.py` | 本目录清册：每个脚本都必须被 README 登记（防止「存在却无人知道」） |
 | **PRE-3** | `mock_impl_check.py` | 确认无人启用的 `impl-mock` 仍能编译（防止静默腐烂） |
+| **PRE-3** | `../regression/test_module_leak_selftest.py` | **防假绿**：纯 `pub` 项不得出现在 `#[cfg(test)]` 模块里（判据自带牙齿自检） |
 | **PRE-3** | `../regression/config_paths_selftest.py` | **S01**：路径必须派生而非写死；含「换 cwd 结果不变」的行为性断言 |
 | **PRE-3** | `../regression/run_smp_selftest.py` | `--smp`/`--no-smp` → QEMU 参数（**E1/S8 判据的输入**） |
 | **PRE-3** | `../regression/symbols_selftest.py` | 地址→符号解析离线自检（真机失败诊断的入口，错了会指向错误函数） |
@@ -56,6 +57,7 @@ python checks/regression/elf_image_selftest.py
 python checks/regression/symbols_selftest.py
 python checks/regression/run_smp_selftest.py
 python checks/regression/config_paths_selftest.py
+python checks/regression/test_module_leak_selftest.py
 python checks/liftoff/mock_impl_check.py
 python checks/regression/diag_selftest.py
 ```
