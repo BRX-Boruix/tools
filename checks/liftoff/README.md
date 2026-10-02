@@ -11,6 +11,7 @@ main() 与退出码，单独调用。是否要一个聚合入口（main.py check
 | **PRE-2** | `l5_handoff_check.py` | QEMU/OVMF 端到端（**交接层**）：串口出现 `username:`；`--matrix` 跑 §4.3 四格覆盖矩阵 |
 | **PRE-2** | `diag_clients_check.py` | 诊断客户端真机验证：RSP 断点/单步/读内存、HMP 寄存器、`screendump` |
 | **PRE-3** | `../regression/check_arch_isolation.py` | 静态隔离：抽象层不得出现实现层依赖；并强制 workspace 成员显式归类 |
+| **PRE-3** | `../regression/check_catalog.py` | 本目录清册：每个脚本都必须被 README 登记（防止「存在却无人知道」） |
 | **PRE-3** | `mock_impl_check.py` | 确认无人启用的 `impl-mock` 仍能编译（防止静默腐烂） |
 | **PRE-3** | `../regression/diag_selftest.py` | 诊断模块离线自检（RSP 校验和、PPM→PNG、畸形输入拒绝、SerialBuffer 边界、停机包等待） |
 
@@ -23,6 +24,7 @@ python checks/liftoff/l5_handoff_check.py             # 单格（约 4 分钟）
 python checks/liftoff/l5_handoff_check.py --matrix    # §4.3 四格覆盖矩阵（约 20 分钟）
 python checks/liftoff/diag_clients_check.py
 python checks/regression/check_arch_isolation.py
+python checks/regression/check_catalog.py
 python checks/liftoff/mock_impl_check.py
 python checks/regression/diag_selftest.py
 ```
