@@ -1,5 +1,16 @@
 # liftoff 检查（gen2）
 
+## 统一入口（A4）
+
+```
+python checks/run_all.py              # 只跑离线检查（秒级，12 项）
+python checks/run_all.py --hardware   # 额外跑需要 QEMU 的检查（每次 5–10 分钟）
+```
+
+退出码 0 = 选中的检查**全部**通过；**空集合不算通过** ✗。新增检查**必须**登记进
+`checks/run_all.py` 的 `OFFLINE_CHECKS` / `HARDWARE_CHECKS` ✓ —— 登记是强制的，
+不靠"自动发现"（自动发现会让"改名后静默少跑"无法察觉 ✗）。
+
 ## 完整验证程序（改一处 liftoff 代码后，按此顺序跑）
 
 **这一节是运维手册（S36）**：把散落的门禁串成一份**可照做**的清单 ✓。
@@ -33,6 +44,7 @@ python checks/regression/run_smp_selftest.py            # PRE-3：--smp → QEMU
 python checks/regression/config_paths_selftest.py       # PRE-3：S01 路径派生
 python checks/regression/test_module_leak_selftest.py   # PRE-3：防假绿（pub 项不得在测试模块里）
 python checks/regression/selftest_registry_check.py     # PRE-3：每个 *_selftest.py 都必须登记在本文档里
+python checks/regression/run_all_selftest.py           # PRE-3：统一回归入口自身的发现/筛选/汇总
 ```
 
 **新增汇编块时**：给它写**只有它能产生**的指纹 ✓，并**故意把它移出编译验证一次** ✓ ——
@@ -113,6 +125,7 @@ main() 与退出码，单独调用。是否要一个聚合入口（main.py check
 | **PRE-3** | `../regression/elf_image_selftest.py` | ELF64 解析器离线自检（合成 ELF 走公开 API；含**惰性校验**的访问期越界） |
 | **PRE-3** | `../regression/iso9660_selftest.py` | ISO9660 解析器离线自检（合成 ISO 走公开 API；坏数据必须报错而非返回伪数据） |
 | **PRE-3** | `../regression/diag_selftest.py` | 诊断模块离线自检（RSP 校验和、PPM→PNG、畸形输入拒绝、SerialBuffer 边界、停机包等待） |
+| **PRE-3** | `../regression/run_all_selftest.py` | **统一回归入口**的自检：默认不带 QEMU 检查、登记表里的文件必须存在、**空集合不算通过**、超时算失败 |
 
 运行（在 `tools` 目录下）：
 
