@@ -45,6 +45,8 @@ python checks/regression/config_paths_selftest.py       # PRE-3：S01 路径派�
 python checks/regression/test_module_leak_selftest.py   # PRE-3：防假绿（pub 项不得在测试模块里）
 python checks/regression/selftest_registry_check.py     # PRE-3：每个 *_selftest.py 都必须登记在本文档里
 python checks/regression/run_all_selftest.py           # PRE-3：统一回归入口自身的发现/筛选/汇总
+python checks/liftoff/size_check.py                    # PRE-1：体积上限（台账 §4.1，所有者裁定 256 KiB）
+python checks/liftoff/debug_path_check.py              # PRE-2 附：qemu_debug 三条真机通路（HMP / RSP / screendump）
 ```
 
 **新增汇编块时**：给它写**只有它能产生**的指纹 ✓，并**故意把它移出编译验证一次** ✓ ——

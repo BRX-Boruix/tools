@@ -45,6 +45,9 @@ OFFLINE_CHECKS = (
     # （我第一版把注释写成了 C 风格的 `//` ✗ —— Python 会当场 SyntaxError，
     #  而"统一入口自己坏了"比"某个检查没过"更坏：它让**所有**检查都不再被执行 ✗。）
     "checks/regression/check_arch_isolation.py",
+    # **量化验收**（台账 §4.1）：体积上限 = 所有者第 106 轮裁定的 **256 KiB** ✓。
+    # 写在文档里的数字不会拦住任何人 ✗ —— 变成可执行的检查才会 ✓。
+    "checks/liftoff/size_check.py",
     "checks/liftoff/asm_check.py",
     "checks/liftoff/mock_impl_check.py",
 )
