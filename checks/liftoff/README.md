@@ -22,6 +22,7 @@ python checks/liftoff/asm_check.py
 python checks/liftoff/l3_gen2_entry_check.py
 python checks/liftoff/l5_handoff_check.py             # 单格（约 4 分钟）
 python checks/liftoff/l5_handoff_check.py --matrix    # §4.3 四格覆盖矩阵（约 20 分钟）
+python checks/liftoff/l5_handoff_check.py --smp 4 --expect-cpus 4   # **S8 判据**：4 核必须报 4
 python checks/liftoff/diag_clients_check.py
 python checks/regression/check_arch_isolation.py
 python checks/regression/check_catalog.py
