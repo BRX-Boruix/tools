@@ -118,8 +118,14 @@ def _find_xorriso() -> str:
         p = os.path.join(msys2, "usr", "bin", "xorriso.exe")
         if os.path.isfile(p):
             return p
-    ff = os.path.join("C:\\", "ffmpeg", "bin", "xorriso.exe")
-    return ff if os.path.isfile(ff) else "xorriso"
+    # 最后手段：**交给 PATH** ✓ —— 此前这里写死了 `C:\ffmpeg\bin\xorriso.exe` ✗，
+    # 那是**本机特有**的路径（S01 禁止：换一台机器就得改代码 ✗）。
+    # 需要指定非 PATH 的安装位置时，用 `BORUIX_XORRISO` 覆盖 ✓
+    # （技能要求：自动探测必须同时提供**显式覆盖**手段 ✓）。
+    override = os.environ.get("BORUIX_XORRISO")
+    if override and os.path.isfile(override):
+        return override
+    return "xorriso"
 
 
 XORRISO = _find_xorriso()
