@@ -51,7 +51,7 @@ MATRIX = [
 ]
 
 
-def run_cell(esp, smp, cpu_args):
+def run_cell(esp, smp, cpu_args, timeout_s=None):
     """跑一格，返回 (是否到达标记, 串口文本)。"""
     cmd = ([liftoff.qemu_exe(), "-m", "1024", "-smp", str(smp), "-display", "none",
             "-serial", "stdio", "-cdrom", config.OUTPUT_ISO]
@@ -60,7 +60,7 @@ def run_cell(esp, smp, cpu_args):
            + liftoff.uefi_args(esp))
     capture = qemu_debug.SerialCapture(cmd)
     try:
-        seen = capture.wait_for(MARKER, TIMEOUT_S)
+        seen = capture.wait_for(MARKER, timeout_s or TIMEOUT_S)
     finally:
         # 必须用 taskkill：Windows 上 QEMU 不随父进程退出，残留进程会占住
         # fat:rw: 的 ESP 目录，让下一次运行失败（实测多次）。
@@ -95,6 +95,9 @@ def main() -> int:
                         help="单格模式的 CPU 模型（缺省即 QEMU 默认模型）")
     parser.add_argument("--dump-serial", default=None, metavar="PATH",
                         help="把每格的串口输出写到该文件（留证；多格时追加并标注格子）")
+    parser.add_argument("--timeout", type=float, default=None, metavar="SECONDS",
+                        help="覆盖等待标记的秒数（默认 %d）。用于**有界诊断**：已知会早期"
+                             "失败时不必等满默认时长" % TIMEOUT_S)
     args = parser.parse_args()
 
     if not os.path.isfile(config.OUTPUT_ISO):
@@ -116,7 +119,7 @@ def main() -> int:
     failures = []
     for smp, cpu_args, desc in cells:
         print("-- 格子: " + desc + " --")
-        seen, text = run_cell(esp, smp, cpu_args)
+        seen, text = run_cell(esp, smp, cpu_args, args.timeout)
         if args.dump_serial:
             with open(args.dump_serial, "a", encoding="utf-8") as handle:
                 handle.write("\n===== %s =====\n" % desc)
@@ -125,7 +128,8 @@ def main() -> int:
             print("  PASS: " + desc + "（%d 字节）" % len(text))
             continue
         failures.append((desc, text))
-        print("  FAIL: " + desc + "（%d 秒内未出现标记，串口 %d 字节）" % (TIMEOUT_S, len(text)))
+        waited = args.timeout or TIMEOUT_S
+        print("  FAIL: " + desc + "（%d 秒内未出现标记，串口 %d 字节）" % (waited, len(text)))
 
     if not failures:
         print("PASS: %d/%d 格全部到达 username:" % (len(cells), len(cells)))
