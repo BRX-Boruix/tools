@@ -40,6 +40,11 @@ OFFLINE_CHECKS = (
     "checks/regression/run_smp_selftest.py",
     "checks/regression/test_module_leak_selftest.py",
     "checks/regression/diag_selftest.py",
+    # **PRE-3 本体**（ADR-052 第 3 层）：中立层不得依赖具体实现 ✓。
+    # 它此前**不在**统一入口里 ✗ —— 于是"PRE-3 在跑吗"这个问题的答案是"能跑，但没人跑" ✗。
+    # （我第一版把注释写成了 C 风格的 `//` ✗ —— Python 会当场 SyntaxError，
+    #  而"统一入口自己坏了"比"某个检查没过"更坏：它让**所有**检查都不再被执行 ✗。）
+    "checks/regression/check_arch_isolation.py",
     "checks/liftoff/asm_check.py",
     "checks/liftoff/mock_impl_check.py",
 )
