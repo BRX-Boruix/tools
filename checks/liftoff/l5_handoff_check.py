@@ -95,9 +95,10 @@ def main() -> int:
                         help="单格模式的 CPU 模型（缺省即 QEMU 默认模型）")
     parser.add_argument("--dump-serial", default=None, metavar="PATH",
                         help="把每格的串口输出写到该文件（留证；多格时追加并标注格子）")
-    parser.add_argument("--expect-cpus", type=int, default=None, metavar="N",
-                        help="断言串口出现 `total cpus=N`。**这是 S8 的判据**：`--smp 4` 时 N 必须是 4。"
-                             "默认不检查 —— 因为当前实现只报 1 核（那是待实现的功能），"
+    parser.add_argument("--expect-cpus", default=None, metavar="N|auto",
+                        help="断言串口出现 `total cpus=N`。**这是 S8 的判据**。传 `auto` 表示"
+                             "「每格期望它**自己的** `--smp` 值」—— 矩阵验证用这个（矩阵各格 smp 不同，"
+                             "单一数值表达不了）。默认不检查：当前实现只报 1 核，那是待实现的功能，"
                              "把默认设成检查会让现有 PASS 全变红。")
     parser.add_argument("--timeout", type=float, default=None, metavar="SECONDS",
                         help="覆盖等待标记的秒数（默认 %d）。用于**有界诊断**：已知会早期"
@@ -132,7 +133,9 @@ def main() -> int:
             # **S8 判据**：到了 `username:` 还不够 —— 还要看 SMP 是否真的起来了。
             # 只报 1 核而请求了 4 核时，这一格必须 FAIL，否则检查会"看起来通过"。
             if args.expect_cpus is not None:
-                needle = "total cpus=%d" % args.expect_cpus
+                # `auto` = 每格期望它自己的 `--smp` —— 矩阵各格不同，单值表达不了。
+                want = smp if args.expect_cpus == "auto" else int(args.expect_cpus)
+                needle = "total cpus=%d" % want
                 if needle not in text:
                     print("  FAIL: " + desc + "（到了 username:，但串口没有 `" + needle + "`）")
                     failures.append((desc + " [SMP]", text))
