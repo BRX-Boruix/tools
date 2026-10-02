@@ -21,6 +21,29 @@ KERNEL_ISO_COMPONENTS = ("boot", "kernel")
 # 构建目标（当前仅 x86_64）
 TARGET = "x86_64-unknown-none"
 QEMU = "qemu-system-x86_64"
+
+# 用户态程序的 TLS 模型（3P4-1）：local-exec。
+#
+# 为何必须显式指定：本 target 的默认模型是 general-dynamic，会产出
+# R_X86_64_DTPOFF32 并要求 __tls_get_addr 与动态重定位——本系统没有动态链接器，
+# 那种形态装载不了。local-exec 的偏移在**链接期**解析（R_X86_64_TPOFF32），
+# 运行时零依赖，静态加载器可直接支持。
+#
+# 注入方式：经 CARGO_TARGET_<TRIPLE>_RUSTFLAGS（**目标域**）而非 RUSTFLAGS——
+# 后者会连带作用于宿主 build script，而 -Z 旗标在宿主上无意义。
+TARGET_RUSTFLAGS = "-Ztls-model=local-exec"
+
+
+def userspace_env(base=None) -> dict:
+    """用户态程序构建环境：在 base（默认 os.environ）上注入目标域 RUSTFLAGS。
+
+    已有同名环境变量时**追加**而非覆盖：调用方显式设的旗标必须保留
+    （自动逻辑可手动覆盖），而 TLS 模型是本系统正确性的硬要求，不能被抹掉。
+    """
+    env = dict(os.environ if base is None else base)
+    key = "CARGO_TARGET_" + TARGET.upper().replace("-", "_") + "_RUSTFLAGS"
+    env[key] = (env.get(key, "") + " " + TARGET_RUSTFLAGS).strip()
+    return env
 # ISO 输出路径。默认 <root>/boruix.iso（S17：与所有既有脚本/e2e 的接线一致）。
 # 可用 BORUIX_ISO_OUT 显式覆盖（S16：构建产物路径可配置——多工作区/CI 矩阵
 # 与「目标文件被System 持锁」这类环境事故下的显式逃生门；覆盖是全局的，

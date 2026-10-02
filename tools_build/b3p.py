@@ -90,7 +90,7 @@ def build_one(name: str, profile: str) -> int:
     ]
     if profile == "release":
         cmd.append("--release")
-    r = subprocess.run(cmd, cwd=config.PROJECT_ROOT)
+    r = subprocess.run(cmd, cwd=config.PROJECT_ROOT, env=config.userspace_env())
     if r.returncode != 0:
         err(f"第三方程序 {name} 编译失败")
         return r.returncode

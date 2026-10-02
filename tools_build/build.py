@@ -321,7 +321,7 @@ def _build_userspace() -> int:
         # 且本仓无 kernel cmdline，故 init 的运行期开关只能靠**构建期**注入。
         # 这里让 init 释放后仍进入交互 shell（**不**自动跑 selftest）——自动化验收
         # 另用 `BORUIX_INIT_ARGS` 环境变量覆盖，正常构建行为完全不变。
-        env = dict(os.environ)
+        env = config.userspace_env()
         if src == "init":
             env.setdefault("BORUIX_INIT_ARGS", "")
         r = subprocess.run(cmd, cwd=config.PROJECT_ROOT, env=env)
