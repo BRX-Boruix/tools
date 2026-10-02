@@ -135,11 +135,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="以 release 配置构建内核（验证正式 release 形态）；默认 debug",
     )
     p_build.add_argument(
-        "--liftoff",
-        action="store_true",
-        help="用 liftoff（UEFI/OVMF）引导：额外产出 liftoff.efi 与 ESP；与 --systemdisk/--release 等组合均成立",
-    )
-    p_build.add_argument(
         "--systemdisk",
         action="store_true",
         help="产系统盘 systemdisk.img（--systemdisk；可与 --disk/--redisk 并存，系统盘与数据盘同时挂载）",
@@ -155,11 +150,6 @@ def build_parser() -> argparse.ArgumentParser:
     p_run = sub.add_parser("run", help="用 QEMU 启动 ISO")
     p_run.add_argument("--mem", default="128M", help="内存大小（默认 128M）")
     p_run.add_argument("--serial", action="store_true", help="启用串口输出到终端")
-    p_run.add_argument(
-        "--liftoff",
-        action="store_true",
-        help="用 liftoff（UEFI/OVMF）启动而非 brxLimine（BIOS）：加 OVMF 固件与 ESP",
-    )
     p_run.add_argument(
         "--silent",
         action="store_true",
@@ -296,11 +286,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_br.add_argument("--mem", default="128M", help="内存大小（默认 128M）")
     p_br.add_argument("--serial", action="store_true", help="启用串口输出到终端")
-    p_br.add_argument(
-        "--liftoff",
-        action="store_true",
-        help="用 liftoff（UEFI/OVMF）构建并启动而非 brxLimine（BIOS）",
-    )
     p_br.add_argument(
         "--silent",
         action="store_true",

@@ -54,7 +54,7 @@ def main() -> int:
     print("== PROJECT_ROOT 下确实有该有的东西 ==")
     # **布局要说对**：`tools_build` 在 `TOOLS_DIR` 下，不是直接在 `PROJECT_ROOT` 下
     # （我第一次就写错了这条断言）。`PROJECT_ROOT` 下应有仓库根的那些子目录。
-    for name in ("liftoff", "docs"):
+    for name in ("docs",):
         check("PROJECT_ROOT 下有 %s" % name,
               os.path.isdir(os.path.join(config.PROJECT_ROOT, name)),
               "实得 %r" % (config.PROJECT_ROOT,))

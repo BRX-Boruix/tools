@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
-"""liftoff 的**统一回归入口**。
+"""tools 的**统一回归入口**。
 
-**为什么需要它**：liftoff 的离线检查此前**各自独立、靠手工逐个跑**—— 台账 §4.2 只说了
-"每个里程碑另加 PRE-2/PRE-3"，**没说谁跑**。于是"某个检查被忘记跑"是常态，
-而**忘记跑**在结果上与"通过"无法区分。
+**为什么需要它**：离线检查此前**各自独立、靠手工逐个跑**—— "每个里程碑另加检查"，
+**没说谁跑**。于是"某个检查被忘记跑"是常态，而**忘记跑**在结果上与"通过"无法区分。
 
 用法：
-    python checks/run_all.py              # 只跑**离线**检查（秒级）
-    python checks/run_all.py --hardware   # 额外跑需要 QEMU 的检查（每次 5–10 分钟）
+    python checks/run_all.py              # 跑**离线**检查（秒级）
+    python checks/run_all.py --hardware   # 额外跑需要 QEMU 的检查（当前登记表为空）
 
 退出码 0 = 选中的检查**全部**通过；非 0 = 有失败 / 超时 / 文件缺失。
 **空集合不算通过**（"一个都没跑"不是"全绿"）。
@@ -21,35 +20,18 @@ import sys
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _TOOLS_DIR = os.path.dirname(_HERE)
 
-# 需要 QEMU 的检查 —— **显式登记**，不靠文件名猜。默认不跑：单次 5–10 分钟，
-# 而 A3 的覆盖矩阵要跑四格。
-HARDWARE_CHECKS = (
-    "checks/liftoff/l5_handoff_check.py",
-)
+# 需要 QEMU 的检查 —— **显式登记**，不靠文件名猜。当前为空（原登记项已随其子系统归档）。
+HARDWARE_CHECKS = ()
 
-# 离线检查（宿主、秒级）。**新增检查必须登记在这里** —— 与
-# `selftest_registry_check.py` 同一约定：**登记是强制的**，不是"能自动发现就不用登记"。
+# 离线检查（宿主、秒级）。**新增检查必须登记在这里** —— 登记是强制的，
+# 不靠"自动发现"：自动发现会让"改名后静默少跑"无法察觉。
 OFFLINE_CHECKS = (
-    "checks/regression/check_catalog.py",
-    "checks/regression/selftest_registry_check.py",
     "checks/regression/run_all_selftest.py",
     "checks/regression/config_paths_selftest.py",
     "checks/regression/iso9660_selftest.py",
     "checks/regression/elf_image_selftest.py",
     "checks/regression/symbols_selftest.py",
     "checks/regression/run_smp_selftest.py",
-    "checks/regression/test_module_leak_selftest.py",
-    "checks/regression/diag_selftest.py",
-    # **PRE-3 本体**（ADR-052 第 3 层）：中立层不得依赖具体实现。
-    # 它此前**不在**统一入口里 —— 于是"PRE-3 在跑吗"这个问题的答案是"能跑，但没人跑"。
-    # （我第一版把注释写成了 C 风格的 `//` —— Python 会当场 SyntaxError，
-    #  而"统一入口自己坏了"比"某个检查没过"更坏：它让**所有**检查都不再被执行。）
-    "checks/regression/check_arch_isolation.py",
-    # **量化验收**（台账 §4.1）：体积上限 = 所有者第 106 轮裁定的 **256 KiB**。
-    # 写在文档里的数字不会拦住任何人 —— 变成可执行的检查才会。
-    "checks/liftoff/size_check.py",
-    "checks/liftoff/asm_check.py",
-    "checks/liftoff/mock_impl_check.py",
 )
 
 # 单个检查的超时。超时**算失败**（不能当成 0）。
@@ -92,9 +74,9 @@ def run_one(relative: str):
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="liftoff 统一回归入口")
+    parser = argparse.ArgumentParser(description="tools 统一回归入口")
     parser.add_argument("--hardware", action="store_true",
-                        help="额外跑需要 QEMU 的检查（每次 5–10 分钟）")
+                        help="额外跑需要 QEMU 的检查（当前登记表为空）")
     args = parser.parse_args()
 
     chosen = select(args.hardware)

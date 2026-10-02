@@ -5,7 +5,7 @@ import os
 import shutil
 import subprocess
 
-from . import config, liftoff
+from . import config
 from .util import err, info
 
 
@@ -32,7 +32,7 @@ def _smp_args(smp_n):
 
     **`-cpu max` 与 `-smp` 必须成对出现**：`-cpu max` 才有多核 APIC 拓扑（LAPIC id 分布更贴近真机）。
     历史上这里出过一个真问题：`-cpu max` 使能了 x2APIC，而当时内核只有 xAPIC 路径，于是崩 ——
-    该违规已在 liftoff 侧修正（读请求字段、按内核请求决定），两条链路现在可以对等比较。
+    修法是让内核按引导器请求的字段决定是否使能 x2APIC，而不是无条件跟着 `-cpu max` 走。
     """
     if smp_n is None:
         # `--no-smp`：**不传任何参数** = 单核启动（不是传 1）。
@@ -125,15 +125,9 @@ def cmd(args: argparse.Namespace) -> int:
     with_disk = getattr(args, "disk", False)
     disk_mode = "redisk" if redisk else ("disk" if with_disk else ("nodisk" if nodisk else "livecd"))
 
-    # --liftoff：UEFI 链路（OVMF + ESP），介质与其它开关照旧。
-    liftoff_mode = bool(getattr(args, "liftoff", False))
-
     # SMP 多核：--smp N（默认 4）→ -smp N；--no-smp（None）→ 不传，单核启动。
     # 加 -cpu max 以启用现代 CPU 特性（多核下 APIC 拓扑/LAPIC id 分布更贴近真机）。
     smp_n = getattr(args, "smp", 4)
-    # --liftoff 与 BIOS 路径使用同一 CPU 模型：此前 liftoff 会无视 SmpRequest.flags
-    # 无条件使能 x2APIC（-cpu max 支持 → 内核只有 xAPIC 路径而崩）。该违规已在
-    # liftoff 侧修正（读请求字段、按内核请求决定），故两条链路现在可以对等比较。
     smp_args = _smp_args(smp_n)
 
     ahci = bool(getattr(args, "ahci", False))
@@ -167,23 +161,11 @@ def cmd(args: argparse.Namespace) -> int:
     if ahci:
         cmd += _ahci_controller_args()
     cmd += disk_args
-    if liftoff_mode:
-        # UEFI：**不传 -boot**。没有 OVMF 变量存储时，OVMF 按默认可移动路径
-        # \EFI\BOOT\BOOTX64.EFI 起 ESP；强加 boot order 会让它找不到引导项，
-        # 直接掉进内置 UEFI Shell（实测症状）。
-        boot_args = []
-    else:
-        boot_args = ["-boot", "order=" + boot_order]
+    boot_args = ["-boot", "order=" + boot_order]
     cmd += boot_args + ["-m", str(args.mem),
             "-netdev", "user,id=net0", "-device", "e1000,netdev=net0"]
     cmd += smp_args
     cmd += config.sound_card_args(silent=silent)
-    if liftoff_mode:
-        # UEFI：OVMF 固件 + ESP（liftoff.efi 摆成 EFI/BOOT/BOOTX64.EFI）。
-        # 介质参数照旧：liveCD 走 -cdrom ISO，--systemdisk 走上面的盘拓扑。
-        esp = liftoff.ensure_ready()
-        cmd += liftoff.uefi_args(esp)
-        info("引导器: liftoff (UEFI/OVMF), ESP=" + esp)
     if args.serial:
         cmd += ["-serial", "stdio"]
     extra = (" + 数据盘 " + os.path.basename(disk_path)) if disk_mode in ("disk", "redisk") else ""
