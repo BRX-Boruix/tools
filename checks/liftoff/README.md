@@ -1,5 +1,63 @@
 # liftoff 检查（gen2）
 
+## 完整验证程序（改一处 liftoff 代码后，按此顺序跑）
+
+**这一节是运维手册（S36）**：把散落的门禁串成一份**可照做**的清单 ✓。
+**顺序有意义** —— 从便宜到贵 ✓：先抓编译与静态问题 ✓，最后才花 5–10 分钟跑 QEMU ✓。
+
+### 第 0 步：闸门（**必须在 liftoff 目录**）
+
+```bash
+cd liftoff
+cargo test                              # 必须退出 0
+cargo build --release --target x86_64-unknown-uefi   # 必须退出 0
+# 且两者**警告数必须为 0**（不是"看起来没有"✗ —— 数出来 ✓）
+```
+
+**⚠️ 退出码 0 不等于代码被编译** ✗ —— 本仓库出过一次"假绿"：整段汇编被夹在 `#[cfg(test)]` 模块里，
+于是 UEFI 构建**根本没编译它**，而构建照样退出 0 ✓。所以第 1 步**必须**跑 ✓。
+
+### 第 1 步：静态与离线（**在 tools 目录**，全部不需要 QEMU）
+
+```bash
+cd tools
+python checks/liftoff/asm_check.py                      # PRE-1：反汇编产物，核对指纹指令与序列
+python checks/regression/check_arch_isolation.py        # PRE-3：中立层无实现依赖
+python checks/liftoff/mock_impl_check.py                # PRE-3：impl-mock 仍能编译
+python checks/regression/check_catalog.py               # PRE-3：每个检查都已登记
+python checks/regression/diag_selftest.py               # PRE-3：诊断模块离线自检
+python checks/regression/iso9660_selftest.py            # PRE-3：ISO9660 解析器
+python checks/regression/elf_image_selftest.py          # PRE-3：ELF64 解析器
+python checks/regression/symbols_selftest.py            # PRE-3：地址→符号
+python checks/regression/run_smp_selftest.py            # PRE-3：--smp → QEMU 参数
+python checks/regression/config_paths_selftest.py       # PRE-3：S01 路径派生
+python checks/regression/test_module_leak_selftest.py   # PRE-3：防假绿（pub 项不得在测试模块里）
+```
+
+**新增汇编块时**：给它写**只有它能产生**的指纹 ✓，并**故意把它移出编译验证一次** ✓ ——
+**若闸门仍绿，说明指纹不够独特** ✗（见下方硬规则 ✓）。
+
+### 第 2 步：真机（PRE-2，**5–10 分钟**）
+
+```bash
+taskkill /F /T /IM qemu-system-x86_64.exe          # 跑前先清（否则会抢串口）
+python checks/liftoff/l5_handoff_check.py --smp 4 --expect-cpus 4 --timeout 420 --dump-serial <file>
+# 覆盖矩阵（四格，约 20 分钟）：
+python checks/liftoff/l5_handoff_check.py --matrix --expect-cpus auto
+```
+
+**`--expect-cpus` 是 S8 判据** ✓ —— 不带它时，"请求 4 核却只报 1 核"**照样 PASS** ✗。
+
+### 第 3 步：推送核实（**每一步提交后都要做**）
+
+```bash
+git push origin <branch>
+git rev-parse HEAD        # 与下面必须一致
+git ls-remote --heads origin <branch>
+```
+
+**"推送成功"不能只看 push 的输出** ✗ —— `git push` 在本仓库**间歇性失败** ✓，必须用 `git ls-remote` 比对 ✓。
+
 ### 一条硬规则（因一次**假绿**事故而立）
 
 **事故**：`crates/arch/x86_64/src/ap.rs` 的 `global_asm!`、常量与 `stage()` 被**整体夹在
