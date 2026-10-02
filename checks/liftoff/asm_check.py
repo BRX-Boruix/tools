@@ -27,14 +27,17 @@ REQUIRED = {
     "outb": (1, "串口初始化与输出"),
     "inb": (1, "串口发送前状态轮询"),
     "cli": (1, "跳板关中断（common64 第一条）"),
-    "lgdtq": (2, "common64 与 spinup32 各加载一次自建 GDT"),
+    "lgdtq": (3, "common64、spinup32、AP 跳板各加载一次自建 GDT"),
     "lidtq": (1, "common64 加载空 IDT"),
     "lretq": (2, "common64 的两次远返回：切 CS=0x28、切 CS=0x18"),
     "lretl": (1, "spinup32 从 32 位切回 64 位"),
     "lldtw": (1, "go32 清 LDT"),
     "ltrw": (1, "go32 加载空 TR"),
     "wrmsr": (2, "go32 清 EFER、spinup32 设 EFER.LME/NX"),
-    "iretq": (1, "构造 iretq 帧进入内核"),
+    "iretq": (2, "BSP 进内核 + AP 跳板跳进 goto_address"),
+    # **AP 跳板独有的指纹** —— 按"每个 global_asm! 块至少要有一条只有它能产生的要求"
+    # 立的规则（见 README）。没有它，整块缺失时闸门照样全绿（那正是第 312 轮的假绿）。
+    "pause": (1, "AP 跳板自旋等内核写 goto_address（spinup 不用 pause）"),
     "rep stosq": (1, "按 base_revision 卸掉低半区"),
     "movq %rax, %cr3": (1, "spinup32 载入内核页表"),
 }
