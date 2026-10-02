@@ -32,6 +32,7 @@ python checks/regression/symbols_selftest.py            # PRE-3：地址→符�
 python checks/regression/run_smp_selftest.py            # PRE-3：--smp → QEMU 参数
 python checks/regression/config_paths_selftest.py       # PRE-3：S01 路径派生
 python checks/regression/test_module_leak_selftest.py   # PRE-3：防假绿（pub 项不得在测试模块里）
+python checks/regression/selftest_registry_check.py     # PRE-3：每个 *_selftest.py 都必须登记在本文档里
 ```
 
 **新增汇编块时**：给它写**只有它能产生**的指纹 ✓，并**故意把它移出编译验证一次** ✓ ——
