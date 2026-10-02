@@ -3,15 +3,15 @@
 
 ## 为什么需要
 
-`checks/regression/check_catalog.py` 只覆盖 `checks/liftoff/` ✗ ——
+`checks/regression/check_catalog.py` 只覆盖 `checks/liftoff/` ——
 所以新加在 `checks/regression/` 的**离线自检**（`iso9660` / `elf_image` / `symbols` / `run_smp` /
-`config_paths` / `test_module_leak`）**没有任何东西强制它们被登记** ✗。
-我登记了 ✓，但**"我登记了"不是机制** ✗。
+`config_paths` / `test_module_leak`）**没有任何东西强制它们被登记**。
+我登记了，但**"我登记了"不是机制**。
 
 ## 为什么范围这么窄
 
-`checks/regression/` 下还有**别的子系统**的检查（不属于 liftoff ✗）——
-对它们提要求会**越界** ✗。所以这里**只**强制 `*_selftest.py` 这一族 ✓。
+`checks/regression/` 下还有**别的子系统**的检查（不属于 liftoff）——
+对它们提要求会**越界**。所以这里**只**强制 `*_selftest.py` 这一族。
 
 退出码：0 = 全部已登记；1 = 有未登记的。
 """
@@ -34,9 +34,9 @@ def selftests() -> list:
 def check_teeth(text: str) -> list:
     """**判据必须有牙齿**：用一个"确定没登记"的合成名字，验证登记逻辑会判它缺失。
 
-    **我第一版写错了** ✗：它断言 `test_module_leak_selftest.py` **不存在** ✗ —— 而它存在 ✓，
-    所以真调用会**永远失败** ✗；而且我当时**没在 `main()` 里调用它** ✗，于是它成了**死代码** ✗。
-    现在两处都修好 ✓：它拿一个合成探针名验证逻辑 ✓，并且**真的被调用** ✓。
+    **我第一版写错了**：它断言 `test_module_leak_selftest.py` **不存在**—— 而它存在，
+    所以真调用会**永远失败**；而且我当时**没在 `main()` 里调用它**，于是它成了**死代码**。
+    现在两处都修好：它拿一个合成探针名验证逻辑，并且**真的被调用**。
     """
     problems = []
     probe = "definitely_not_registered_selftest.py"

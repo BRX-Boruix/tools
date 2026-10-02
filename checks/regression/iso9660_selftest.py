@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """离线自检：`tools_build/iso9660.py`（PRE-3，**不需要 QEMU**）。
 
-为什么需要：`iso9660.py` 是**纯二进制解析器**，而它此前**没有任何测试** ✗。
-解析器的错误不会崩 —— 它会**静默返回错误的字节**，然后被当成合法的符号/重定位结论 ✗
-（该模块自己的文档里就记着这个教训：曾经把「内核在 LBA 33」写死成常量 ✓）。
+为什么需要：`iso9660.py` 是**纯二进制解析器**，而它此前**没有任何测试**。
+解析器的错误不会崩 —— 它会**静默返回错误的字节**，然后被当成合法的符号/重定位结论
+（该模块自己的文档里就记着这个教训：曾经把「内核在 LBA 33」写死成常量）。
 
 做法：**合成一张最小 ISO**，走**公开 API**（`find_file` / `read_file`），
-不测私有函数 ✗ —— 测真实路径 ✓。
+不测私有函数 —— 测真实路径。
 
 退出码：0 = 全部通过；1 = 有失败（逐条打印）。
 """
@@ -34,7 +34,7 @@ def _both_u32(value):
 
 def _record(name, extent, size, is_dir=False):
     """造一个目录项（ECMA-119 9.1）。"""
-    # 根目录项的名字是单个 0 字节，所以**两种输入都要收** ✓（我第一次只收 str，撞了 ✗）。
+    # 根目录项的名字是单个 0 字节，所以**两种输入都要收**（我第一次只收 str，撞了）。
     raw = name if isinstance(name, bytes) else name.encode("ascii")
     rec = bytearray(33 + len(raw))
     rec[0] = len(rec)
@@ -61,7 +61,7 @@ def build_iso(path, *, pvd_signature=None, break_dual_endian=False):
     pvd[1:6] = pvd_signature if pvd_signature is not None else iso9660.VOLUME_ID
     root = _record(b"\x00", ROOT_LBA, sector, is_dir=True)
     if break_dual_endian:
-        # 只改小端那一半 —— 两半不一致必须被拒绝，而不是取其中一半 ✗。
+        # 只改小端那一半 —— 两半不一致必须被拒绝，而不是取其中一半。
         root = bytearray(root)
         root[2:6] = struct.pack("<I", ROOT_LBA + 1)
         root = bytes(root)

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """离线自检：`tools_build/run.py` 的 `_smp_args`（PRE-3，**不需要 QEMU**）。
 
-为什么需要：这个函数决定"给虚拟机几颗核" ✓ —— 而 **E1/S8 的判据就是
-`total cpus=N` 必须等于这里给的 N** ✓。它此前内联在 `cmd()` 里、不可测 ✗。
+为什么需要：这个函数决定"给虚拟机几颗核" —— 而 **E1/S8 的判据就是
+`total cpus=N` 必须等于这里给的 N**。它此前内联在 `cmd()` 里、不可测。
 
 退出码：0 = 全部通过；1 = 有失败。
 """
@@ -43,7 +43,7 @@ def main() -> int:
 
     print("== 默认值 ==")
     # 默认由 `cmd()` 的 `getattr(args, "smp", 4)` 给出 —— 这里断言那个数字本身，
-    # 因为 S8 要跑 4 核；默认值悄悄变了会让检查在错误的核数上"通过" ✗。
+    # 因为 S8 要跑 4 核；默认值悄悄变了会让检查在错误的核数上"通过"。
     import inspect
     source = inspect.getsource(run.cmd)
     check("cmd() 的默认 --smp 是 4", 'getattr(args, "smp", 4)' in source,

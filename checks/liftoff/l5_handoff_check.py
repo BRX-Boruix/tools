@@ -4,7 +4,7 @@
 真实链路：OVMF 固件 -> ESP（USB 可移动介质）里的 BOOTX64.EFI -> liftoff ->
 ISO9660 上的 /boot/kernel -> 内核 -> 用户态 init 及其守护进程 -> 登录提示符。
 
-判定标准（量化）：串口上出现 username: 。这是 L5「交接」的验收条件——它要求链路
+判定标准（量化）：串口上出现 username:。这是 L5「交接」的验收条件——它要求链路
 每一环都真的通了：响应填充（HHDM/内存映射/RSDP/帧缓冲/可执行文件/SMP）、
 exit_prepared 取 map_key、覆盖检查、跳板交付的机器状态、以及内核能加载并运行用户态。
 任何一环坏了，username: 都不会出现。

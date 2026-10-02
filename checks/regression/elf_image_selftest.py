@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """离线自检：`tools_build/elf_image.py`（PRE-3，**不需要 QEMU**）。
 
-为什么需要：与 `iso9660.py` 同类 —— **纯二进制解析器**，此前没有任何测试 ✗。
-解析器错了不会崩，会**静默返回错误的符号/地址结论** ✗。
+为什么需要：与 `iso9660.py` 同类 —— **纯二进制解析器**，此前没有任何测试。
+解析器错了不会崩，会**静默返回错误的符号/地址结论**。
 
 做法：合成最小 ELF64 走**公开 API**（`parse` / `section_names` / `section` / `segments`），
-重点覆盖**拒绝路径** ✓ —— 与 `iso9660_selftest.py` 同一套路 ✓。
+重点覆盖**拒绝路径**—— 与 `iso9660_selftest.py` 同一套路。
 
-**范围声明**：只测本文件已核实的行为 ✓。`read_vaddr` / `symbols` / `resolve` 的语义
-我没有逐行读过 ✗，**因此不在此断言** ✗ —— 不猜语义、不写"看起来对"的测试 ✓。
+**范围声明**：只测本文件已核实的行为。`read_vaddr` / `symbols` / `resolve` 的语义
+我没有逐行读过，**因此不在此断言**—— 不猜语义、不写"看起来对"的测试。
 
 退出码：0 = 全部通过；1 = 有失败。
 """
@@ -50,8 +50,8 @@ def build_elf(*, magic_class=2, data_encoding=1, phnum=1, shnum=2, truncate=0,
         62,     # EM_X86_64
         1,
         0x400000,   # e_entry
-        # **越界必须是"无歧义地超出映像"**：我第一次把 `e_phoff` 设成 0 ✗ ——
-        # 那不是越界，只是从头开始读 ✓，于是断言"没报错" ✗。用远超映像的值 ✓。
+        # **越界必须是"无歧义地超出映像"**：我第一次把 `e_phoff` 设成 0 ——
+        # 那不是越界，只是从头开始读，于是断言"没报错"。用远超映像的值。
         0x1_0000 if bad_phoff else phoff,
         0x1_0000 if bad_shoff else shoff,
         0, 64, 56, phnum, 64, shnum, shstr_index,
@@ -85,10 +85,10 @@ def main() -> int:
             failures.append(label)
 
     def rejects(label, action):
-        # **`parse` 是惰性的**：它只校验 ELF 文件头 ✓，节头/程序头的越界要到
-        # `section_names()` / `segments()` 被**访问**时才检查 ✓。
-        # 我第一次写这个测试时以为 `parse` 校验一切，于是三项都"没报错" ✗ ——
-        # **那是我的断言错，不是实现错** ✓。所以这里收一个**动作**而不是数据 ✓。
+        # **`parse` 是惰性的**：它只校验 ELF 文件头，节头/程序头的越界要到
+        # `section_names()` / `segments()` 被**访问**时才检查。
+        # 我第一次写这个测试时以为 `parse` 校验一切，于是三项都"没报错" ——
+        # **那是我的断言错，不是实现错**。所以这里收一个**动作**而不是数据。
         try:
             action()
         except elf_image.ElfError:
@@ -111,12 +111,12 @@ def main() -> int:
     check("段类型是 PT_LOAD", segs[0].type == PT_LOAD, "实得 %r" % segs[0].type)
 
     print("== 拒绝坏数据 ==")
-    # 「太短」= 短于 ELF 文件头本身（64 字节），`parse` 立刻拒绝 ✓。
+    # 「太短」= 短于 ELF 文件头本身（64 字节），`parse` 立刻拒绝。
     rejects("数据短于文件头 -> ElfError", lambda: elf_image.ElfImage.parse(build_elf()[:40]))
     rejects("魔数不对 -> ElfError", lambda: elf_image.ElfImage.parse(b"NOTELF" + build_elf()[6:]))
     rejects("ELFCLASS32 -> ElfError", lambda: elf_image.ElfImage.parse(build_elf(magic_class=1)))
     rejects("大端 -> ElfError", lambda: elf_image.ElfImage.parse(build_elf(data_encoding=2)))
-    # 程序头偏移指向映像之外 —— **只有访问 `segments()` 才会发现** ✓。
+    # 程序头偏移指向映像之外 —— **只有访问 `segments()` 才会发现**。
     rejects("程序头偏移越界 -> ElfError（访问时发现）",
             lambda: elf_image.ElfImage.parse(build_elf(bad_phoff=True)).segments())
 

@@ -5,15 +5,15 @@
 - **RSP**（gdb stub）：读寄存器、**按找到的代码地址**读内存 / 下断点 / 单步；
 - **screendump**：HMP 截屏 → ppm → png。
 
-**为什么需要它**：这些能力此前只在**临时脚本**里验证过 ✗，提升成正式模块之后
-**没有在真机上跑过** ✓ —— 于是"它到底能不能用"没有证据 ✗。本检查给出真实输出，
-逐条 PASS/FAIL，而不是"看起来对" ✓。
+**为什么需要它**：这些能力此前只在**临时脚本**里验证过，提升成正式模块之后
+**没有在真机上跑过**—— 于是"它到底能不能用"没有证据。本检查给出真实输出，
+逐条 PASS/FAIL，而不是"看起来对"。
 
-**第 135 轮实测得到的两条事实，直接决定了本脚本怎么写** ✓：
-1. `RspClient.registers()` 返回**扁平整数列表**（76 项），**没有名字** ✗ ——
-   所以**不能**按 `rip` 取，只能**按值的范围**找出代码地址 ✓。
-2. `MonitorClient.command()` 的回包**含终端回显与 `[K`/`[D` 噪声** ✗ ——
-   必须剥离后再断言，否则判据很脆弱 ✓。
+**第 135 轮实测得到的两条事实，直接决定了本脚本怎么写**：
+1. `RspClient.registers()` 返回**扁平整数列表**（76 项），**没有名字**——
+   所以**不能**按 `rip` 取，只能**按值的范围**找出代码地址。
+2. `MonitorClient.command()` 的回包**含终端回显与 `[K`/`[D` 噪声**——
+   必须剥离后再断言，否则判据很脆弱。
 """
 import os
 import re
@@ -27,7 +27,7 @@ from tools_build import config, liftoff, qemu_debug  # noqa: E402
 MARKER = b"username:"
 GDB_PORT = qemu_debug.DEFAULT_GDB_PORT
 MON_PORT = 45454
-# 内核代码段的高半区（本会话实测内核入口在 0xffffffff800378d0 附近）✓。
+# 内核代码段的高半区（本会话实测内核入口在 0xffffffff800378d0 附近）。
 KERNEL_LOW = 0xFFFF_FFFF_8000_0000
 KERNEL_HIGH = 0xFFFF_FFFF_FFFF_FFFF
 
@@ -35,15 +35,15 @@ _ECHO = re.compile(r"\[K|\[D|\x1b\[[0-9;]*[A-Za-z]")
 
 
 def clean_hmp(text: str) -> str:
-    """剥掉 HMP 回包里的终端回显与转义噪声（**纯逻辑** ✓）。"""
+    """剥掉 HMP 回包里的终端回显与转义噪声（**纯逻辑**）。"""
     return _ECHO.sub("", text)
 
 
 def find_code_address(regs) -> int:
-    """在**没有名字**的扁平寄存器列表里找出一个代码地址（**纯逻辑** ✓）。
+    """在**没有名字**的扁平寄存器列表里找出一个代码地址（**纯逻辑**）。
 
-    取第一个落在内核高半区的值；找不到就退到索引 16（x86-64 的 g-packet 里 `rip` 的位置）✓。
-    两个都拿不到就返回 0，由调用方如实报"找不到"，**不编一个地址** ✗。
+    取第一个落在内核高半区的值；找不到就退到索引 16（x86-64 的 g-packet 里 `rip` 的位置）。
+    两个都拿不到就返回 0，由调用方如实报"找不到"，**不编一个地址**。
     """
     for value in regs:
         if isinstance(value, int) and KERNEL_LOW <= value <= KERNEL_HIGH:
@@ -61,8 +61,8 @@ def main() -> int:
            + config.sound_card_args(silent=True)
            + liftoff.uefi_args(esp)
            + ["-s", "-monitor", "tcp:127.0.0.1:%d,server,nowait" % MON_PORT])
-    # **用字典记账** ✓ —— 第 135 轮我用列表，异常分支把同一个名字记了两次 ✗，
-    # 于是汇总里同一项既 ok 又 FAIL ✗。字典从结构上不可能重复 ✓。
+    # **用字典记账**—— 第 135 轮我用列表，异常分支把同一个名字记了两次，
+    # 于是汇总里同一项既 ok 又 FAIL。字典从结构上不可能重复。
     results = {}
     cap = qemu_debug.SerialCapture(cmd)
     try:

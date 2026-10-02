@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """离线自检：`tools_build/config.py` 的路径是否**派生**而非写死（PRE-3，**S01**）。
 
-为什么需要：S01 要求"零硬编码路径" ✓ —— 但**靠人看代码是会漏的** ✗。
-这个检查把它变成**机器可判**的 ✓，其中最关键的一条是**行为性**的：
-**换一个工作目录，`PROJECT_ROOT` 必须一模一样** ✓（写死相对路径或依赖 cwd 的实现会在这里露馅 ✗）。
+为什么需要：S01 要求"零硬编码路径" —— 但**靠人看代码是会漏的**。
+这个检查把它变成**机器可判**的，其中最关键的一条是**行为性**的：
+**换一个工作目录，`PROJECT_ROOT` 必须一模一样**（写死相对路径或依赖 cwd 的实现会在这里露馅）。
 
 退出码：0 = 全部通过；1 = 有失败。
 """
@@ -52,8 +52,8 @@ def main() -> int:
         check("%s 是绝对路径" % name, bool(value) and os.path.isabs(value), "实得 %r" % (value,))
 
     print("== PROJECT_ROOT 下确实有该有的东西 ==")
-    # **布局要说对**：`tools_build` 在 `TOOLS_DIR` 下 ✓，不是直接在 `PROJECT_ROOT` 下 ✗
-    # （我第一次就写错了这条断言 ✗）。`PROJECT_ROOT` 下应有仓库根的那些子目录 ✓。
+    # **布局要说对**：`tools_build` 在 `TOOLS_DIR` 下，不是直接在 `PROJECT_ROOT` 下
+    # （我第一次就写错了这条断言）。`PROJECT_ROOT` 下应有仓库根的那些子目录。
     for name in ("liftoff", "docs"):
         check("PROJECT_ROOT 下有 %s" % name,
               os.path.isdir(os.path.join(config.PROJECT_ROOT, name)),
