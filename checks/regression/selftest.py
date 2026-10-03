@@ -137,7 +137,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="BORUIX 内核自动化测试")
     parser.add_argument("--timeout", type=int, default=60, help="QEMU 超时秒数（默认 60）")
     parser.add_argument("--rebuild", action="store_true", help="强制完整重建")
-    parser.add_argument("--mem", default="128M", help="QEMU 内存（默认 128M）")
+    parser.add_argument("--mem", default=config.DEFAULT_MEM, help="QEMU 内存（默认见 config.DEFAULT_MEM）")
     args = parser.parse_args()
 
     # 1. 构建带自检的内核 + ISO

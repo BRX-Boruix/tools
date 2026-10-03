@@ -22,6 +22,16 @@ KERNEL_ISO_COMPONENTS = ("boot", "kernel")
 TARGET = "x86_64-unknown-none"
 QEMU = "qemu-system-x86_64"
 
+# QEMU 默认内存（**单一来源**：main.py 的 run/br 与 checks/regression/selftest.py 共用）。
+#
+# 为什么是 256M 而不是更小的 128M：内核的**承诺预算** = 物理内存的一半，而每个进程在
+# 建立地址空间时按 4 MiB 用户栈**整段预留**提交（mm::user_space 的保守策略，见
+# check_area_quota 文档）。128M 下预算 ≈ 47 MiB，而正常启动的 10 个进程已占 ≈ 43 MiB
+# （92%）——任何额外进程（例如 --run= 非交互跑一次）都会以 ENOSPC(28) 失败，表现为
+# consoled/login 起不来（实测：第 4 个 consoled 与 login 均 errno=28）。256M 把预算提到
+# ≈ 110 MiB，留出正常余量。这是**测试环境**参数：真实硬件的预算随内存线性增长，不受此限。
+DEFAULT_MEM = "256M"
+
 # 用户态程序的 TLS 模型（3P4-1）：local-exec。
 #
 # 为何必须显式指定：本 target 的默认模型是 general-dynamic，会产出

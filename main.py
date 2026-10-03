@@ -17,7 +17,7 @@ BORUIX 系统工具统一入口（系统集成、构建与验收）。
 import argparse
 import sys
 
-from tools_build import b3p, br, build, disk, elf_image, limine_build, run
+from tools_build import b3p, br, build, config, disk, elf_image, limine_build, run
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -148,7 +148,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # run 子命令
     p_run = sub.add_parser("run", help="用 QEMU 启动 ISO")
-    p_run.add_argument("--mem", default="128M", help="内存大小（默认 128M）")
+    p_run.add_argument("--mem", default=config.DEFAULT_MEM, help="内存大小（默认见 config.DEFAULT_MEM）")
     p_run.add_argument("--serial", action="store_true", help="启用串口输出到终端")
     p_run.add_argument(
         "--silent",
@@ -284,7 +284,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="以 release 配置构建内核（验证正式 release 形态）；默认 debug",
     )
-    p_br.add_argument("--mem", default="128M", help="内存大小（默认 128M）")
+    p_br.add_argument("--mem", default=config.DEFAULT_MEM, help="内存大小（默认见 config.DEFAULT_MEM）")
     p_br.add_argument("--serial", action="store_true", help="启用串口输出到终端")
     p_br.add_argument(
         "--silent",
