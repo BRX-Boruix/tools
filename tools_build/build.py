@@ -182,6 +182,29 @@ def _make_iso(profile: str = "debug") -> int:
     )
     prog_dir = os.path.join(iso_root, "programs")
     os.makedirs(prog_dir, exist_ok=True)
+    # 3P4-7 验收辅助：把指定程序的**源 ELF**填充到 N MiB（格式 "名字:MiB"），随后
+    # 由下面的拷贝循环原样带进 ISO。
+    #
+    # 为什么需要它：旧 exec 形状是「整读进内核堆」且受 MAX_SYSCALL_BUF_BYTES（64MiB，
+    # 单次 IO 有界性设计）设门，>64MiB 的镜像会被直接拒绝。填充字节落在所有段之后，
+    # **不影响可执行性**——这正是「程序体积不再受单次拷贝上限约束」的实证面。
+    # 注意：必须填充**源**文件（crates/kernel/<name>.elf），目标目录此刻还是空的。
+    pad = os.environ.get("BORUIX_PAD_PROGRAM", "")
+    if pad:
+        name, _, mb = pad.partition(":")
+        if not name or not mb.isdigit():
+            err(f"BORUIX_PAD_PROGRAM 格式应为 名字:MiB，得到 {pad!r}")
+            return 1
+        target = int(mb) * 1024 * 1024
+        src_elf = os.path.join(config.KERNEL_DIR, "crates", "kernel", name + ".elf")
+        if not os.path.isfile(src_elf):
+            err(f"BORUIX_PAD_PROGRAM 指定的程序不存在: {src_elf}")
+            return 1
+        cur = os.path.getsize(src_elf)
+        if cur < target:
+            with open(src_elf, "ab") as f:
+                f.write(b"\0" * (target - cur))
+        info(f"3P4-7：{name}.elf 已填充到 {target // (1024 * 1024)} MiB（分段装载验收用）")
     for name in USER_PROGRAMS + extra_programs:
         elf = os.path.join(config.KERNEL_DIR, "crates", "kernel", name + ".elf")
         if not os.path.isfile(elf):
