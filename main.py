@@ -378,6 +378,26 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="只列出第三方程序清单，不构建",
     )
+    # --new：生成最小可编译骨架（3P1-6）。生成**现代形态**——无 build.rs、无 linker.ld，
+    # 目标定义/链接脚本/TLS 模型全部来自 sysroot 的 cargo 配置。
+    p_b3p.add_argument(
+        "--new",
+        metavar="NAME",
+        default=None,
+        help="生成最小可编译工程骨架（需 --sysroot 或 BORUIX_SYSROOT）",
+    )
+    p_b3p.add_argument(
+        "--sysroot",
+        default=None,
+        metavar="DIR",
+        help="sysroot 目录（python main.py install --prefix <DIR> 的产物）",
+    )
+    p_b3p.add_argument(
+        "--dir",
+        default=None,
+        metavar="PARENT",
+        help="骨架生成到哪个父目录下（默认当前目录）",
+    )
     p_b3p.set_defaults(func=b3p.cmd)
 
     # where 子命令：把内核 ELF 里的地址反解成 `模块::路径::函数+偏移`（诊断用）。

@@ -136,8 +136,84 @@ def build_all(profile: str = DEFAULT_PROFILE, only=None) -> int:
     return 0
 
 
+
+
+# ---------- --new：生成最小可编译骨架（3P1-6）----------
+#
+# 生成的是**现代形态**：Cargo.toml（git 依赖 libsys）+ src/main.rs + .cargo/config.toml
+# （取自 sysroot）。**不含 build.rs、不含 linker.ld**——目标定义、链接脚本与 TLS 模型都由
+# sysroot 的 cargo 配置提供（3P1-3）。因此必须指明 sysroot：--sysroot <prefix> 或环境变量
+# BORUIX_SYSROOT。
+
+NEW_MAIN_RS = """//! {name} - BORUIX 用户态程序（由 `b3p --new` 生成）。
+//!
+//! 工程里只有本文件 + Cargo.toml + .cargo/config.toml：目标定义、链接脚本与 TLS 模型都由
+//! sysroot 提供（见 docs/TODO/3p.md 阶段 1）。改完 `cargo build`，产物在
+//! `target/boruix/<profile>/{name}`。
+#![no_std]
+#![no_main]
+
+// panic_handler 由 libsys 提供（其 cfg 已覆盖 os="boruix"），此处不得重复定义。
+
+#[unsafe(no_mangle)]
+pub extern "C" fn user_main(_argc: isize, _argv: *const *const u8) -> i32 {{
+    let _ = libsys::write(1, b"hello from {name}\n");
+    0
+}}
+"""
+
+NEW_CARGO_TOML = """[package]
+name = "{name}"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+# 3P1-5：git 依赖（工程目录独立于系统源码树）。
+libsys = {{ git = "https://github.com/BRX-Boruix/libsys" }}
+
+[profile.dev]
+panic = "abort"
+[profile.release]
+panic = "abort"
+"""
+
+
+def new_project(name: str, sysroot: str, parent: str) -> int:
+    """生成最小可编译骨架。返回 0 成功。已存在同名目录即如实拒绝（绝不覆盖）。"""
+    src_cfg = os.path.join(sysroot, "cargo-config.toml")
+    if not os.path.isfile(src_cfg):
+        err("sysroot 不完整，缺少 cargo-config.toml: " + sysroot)
+        err("先用 `python tools/main.py install --prefix <dir>` 产出一个 sysroot。")
+        return 1
+    dest = os.path.join(parent, name)
+    if os.path.exists(dest):
+        err("目标目录已存在，拒绝覆盖: " + dest)
+        return 1
+    os.makedirs(os.path.join(dest, "src"))
+    os.makedirs(os.path.join(dest, ".cargo"))
+    with open(os.path.join(dest, "Cargo.toml"), "w", encoding="utf-8", newline="\n") as f:
+        f.write(NEW_CARGO_TOML.format(name=name))
+    with open(os.path.join(dest, "src", "main.rs"), "w", encoding="utf-8", newline="\n") as f:
+        f.write(NEW_MAIN_RS.format(name=name))
+    shutil.copy(src_cfg, os.path.join(dest, ".cargo", "config.toml"))
+    info("已生成工程: " + dest)
+    print("  Cargo.toml")
+    print("  src/main.rs")
+    print("  .cargo/config.toml  (来自 sysroot: " + sysroot + ")")
+    info("构建: cd " + dest + " && cargo build   产物: target/boruix/debug/" + name)
+    return 0
+
+
 def cmd(args: argparse.Namespace) -> int:
     """b3p 子命令入口。"""
+    new_name = getattr(args, "new", None)
+    if new_name:
+        sysroot = getattr(args, "sysroot", None) or os.environ.get("BORUIX_SYSROOT")
+        if not sysroot:
+            err("b3p --new 需要 sysroot：传 --sysroot <prefix> 或设 BORUIX_SYSROOT。")
+            return 1
+        parent = getattr(args, "dir", None) or os.getcwd()
+        return new_project(new_name, sysroot, parent)
     if getattr(args, "list", False):
         for n in THIRD_PARTY_PROGRAMS:
             print(n)
