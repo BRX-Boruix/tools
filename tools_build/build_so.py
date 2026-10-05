@@ -50,7 +50,11 @@ def main():
     env["CARGO_TARGET_X86_64_UNKNOWN_BORUIX_RUSTFLAGS"] = (
         "-Zunstable-options -Ztls-model=local-exec"
     )
+    # **--no-default-features**：关掉 libc/libsys 的 `crt` feature——`.so` 是库，不该带
+    # 进程入口 `_start`（它会引用 `user_main`，在 `.so` 里留下 `UND user_main`，使 rtld 的
+    # 急切符号解析失败；实测过）。静态可执行文件路径仍用默认（crt 开）。
     cmd = ["cargo", "build", "--manifest-path", os.path.join(LIBC, "Cargo.toml"),
+           "--no-default-features",
            "-Z", "build-std=core,alloc", "--target", TARGET]
     if profile == "release":
         cmd.append("--release")
@@ -61,9 +65,14 @@ def main():
         sys.exit("找不到 staticlib: " + a)
     out = os.path.join(LIBC, "target", TARGET, profile, SONAME)
     lld = os.environ.get("BORUIX_LLD") or "ld.lld"
+    # `--whole-archive` 是**必需**的：`-shared` 下链接器只拉取**被引用**的归档成员，
+    # 而 version script **不会创建引用**——没有它就几乎没有根，`.so` 会缩到 1.6 KB、只剩 4 个
+    # 符号（实测踩过：`.a` 里明明有 printf，`.so` 里却没有）。
+    # 拉入全部成员后，由 `--gc-sections` + version script 收敛到 C ABI。
     run([lld, "-shared", "-soname", SONAME, "-z", "norelro", "--gc-sections",
          "--version-script=" + os.path.join(LIBC, "abi-exports.txt"),
-         "-o", out, a])
+         "--whole-archive", a, "--no-whole-archive",
+         "-o", out])
     print("[build_so] 产出", out, "(%d KB)" % (os.path.getsize(out) // 1024))
 
 
