@@ -104,17 +104,22 @@ if __name__ == "__main__":
 CARGO_CONFIG_TEMPLATE = """# BORUIX 用户级 cargo 配置（由 install 生成，3P1-3）。
 # 放在工程根 .cargo/config.toml 即可：目标定义、链接脚本与 TLS 模型都在这里固化，
 # 工程本身因此不需要 build.rs，也不需要自带 linker.ld。
+#
+# 目标是**按规范三元组名**使用的（3P2-4）：RUST_TARGET_PATH 指向 sysroot，cargo 在那里
+# 找到 x86_64-unknown-boruix.json。rustc 加载自定义目标规格要求 -Zunstable-options。
 
 [build]
-target = "{json}"
-rustflags = ["-Clink-arg=-T{ld}", "-Ztls-model=local-exec"]
+target = "x86_64-unknown-boruix"
+rustflags = ["-Zunstable-options", "-Clink-arg=-T{ld}", "-Ztls-model=local-exec"]
+
+[env]
+RUST_TARGET_PATH = "{prefix}"
 
 [unstable]
 # 自定义目标没有预编译的 core/alloc，必须自己构建（内建 x86_64-unknown-none 才有）。
 # alloc 是 libsys 的依赖 buddy_system_allocator 所必需——实测只列 core 会报
 # "can't find crate for alloc"。
 build-std = ["core", "alloc"]
-json-target-spec = true
 """
 
 
@@ -183,12 +188,14 @@ def cmd(args) -> int:
     shutil.copy(os.path.join(config.PROJECT_ROOT, "csrc", "linker.ld"),
                 os.path.join(lib_dir, "linker.ld"))
 
-    shutil.copy(os.path.join(config.PROJECT_ROOT, "sdk", "boruix.json"),
-                os.path.join(prefix, "boruix.json"))
+    # 目标规格以**规范三元组名**落在 sysroot 根：这样 RUST_TARGET_PATH=<prefix> 即可按名使用
+    # （3P2-4 端点 B 的本地 Tier-3 形态），不再依赖 --target <path.json>。
+    shutil.copy(os.path.join(config.PROJECT_ROOT, "sdk", "x86_64-unknown-boruix.json"),
+                os.path.join(prefix, "x86_64-unknown-boruix.json"))
 
     with open(os.path.join(prefix, "cargo-config.toml"), "w", encoding="utf-8") as f:
         f.write(CARGO_CONFIG_TEMPLATE.format(
-            json=os.path.join(prefix, "boruix.json").replace(os.sep, "/"),
+            prefix=prefix.replace(os.sep, "/"),
             ld=os.path.join(lib_dir, "linker.ld").replace(os.sep, "/"),
         ))
 
