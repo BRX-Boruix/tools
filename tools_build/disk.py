@@ -740,6 +740,13 @@ def cmd_mkimg(args):
     label = getattr(args, "label", "BORUIX_DATA")
     force = getattr(args, "force", False)
     if os.path.isfile(path) and not force:
+        # 非交互环境**绝不阻塞**：stdin 不是终端时 `input()` 可能永远读不到 EOF（管道不关闭），
+        # 表现为构建**静默挂起**——本项在阶段 1 的验收里连踩三次。此处如实报错并给出两条出路，
+        # 而不是等待一个永远不会到来的回车。
+        if not sys.stdin.isatty():
+            err("磁盘镜像已存在，且无法确认覆盖（stdin 不是终端）: " + path)
+            err("出路：先删除该文件，或传 --force 显式覆盖，或用 `run --redisk` 重建后再挂载。")
+            return 1
         print("\n[警告] 磁盘镜像文件 " + repr(path) + " 已经存在。")
         try:
             choice = input("是否确认覆盖重新格式化？所有已有数据将被清除！[y/N]: ").strip().lower()

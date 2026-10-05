@@ -110,7 +110,10 @@ target = "{json}"
 rustflags = ["-Clink-arg=-T{ld}", "-Ztls-model=local-exec"]
 
 [unstable]
-build-std = ["core"]
+# 自定义目标没有预编译的 core/alloc，必须自己构建（内建 x86_64-unknown-none 才有）。
+# alloc 是 libsys 的依赖 buddy_system_allocator 所必需——实测只列 core 会报
+# "can't find crate for alloc"。
+build-std = ["core", "alloc"]
 json-target-spec = true
 """
 
