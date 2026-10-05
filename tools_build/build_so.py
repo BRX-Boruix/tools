@@ -33,6 +33,26 @@ TARGET = "x86_64-unknown-boruix"
 SONAME = "libboruixc.so.1"
 
 
+def read_export_list(path):
+    """从 version script 里取出 `global:` 段的符号名（用于 `-u` 声明 gc 根）。"""
+    names = []
+    in_global = False
+    with open(path, "r", encoding="ascii") as f:
+        for line in f:
+            t = line.strip()
+            if t.startswith("global:"):
+                in_global = True
+                continue
+            if t.startswith("local:"):
+                in_global = False
+                continue
+            if in_global and t.endswith(";"):
+                names.append(t[:-1].strip())
+    if not names:
+        sys.exit("abi-exports.txt 里没有 global 符号——拒绝产出无导出的 .so")
+    return names
+
+
 def run(cmd, env=None):
     print("+", " ".join(cmd))
     r = subprocess.run(cmd, env=env)
@@ -65,14 +85,29 @@ def main():
         sys.exit("找不到 staticlib: " + a)
     out = os.path.join(LIBC, "target", TARGET, profile, SONAME)
     lld = os.environ.get("BORUIX_LLD") or "ld.lld"
+    # **把每个导出符号变成 gc 的根**：`--gc-sections` 只保留「从根可达」的代码，而
+    # **version script 不创建引用**——所以像 `sqrt` 这种「无人内部引用」的导出函数会被裁掉
+    # （实测：`.a` 里有 `sqrt`，`.so` 里没有，链接下游程序时报 undefined symbol）。
+    # 用 `-u <sym>` 逐个声明为根，导出面才真正稳定。
     # `--whole-archive` 是**必需**的：`-shared` 下链接器只拉取**被引用**的归档成员，
     # 而 version script **不会创建引用**——没有它就几乎没有根，`.so` 会缩到 1.6 KB、只剩 4 个
     # 符号（实测踩过：`.a` 里明明有 printf，`.so` 里却没有）。
     # 拉入全部成员后，由 `--gc-sections` + version script 收敛到 C ABI。
+    syms = read_export_list(os.path.join(LIBC, "abi-exports.txt"))
+    keep = []
+    for s in syms:
+        keep += ["-u", s]
+    print("[build_so] 把 %d 个导出符号声明为 gc 根" % len(syms))
+    # **保留 `--gc-sections`**（实测取舍）：去掉它体积从 135 KB 涨到 690 KB，且多出的重定位里
+    # 有一个会写入未映射地址 → rtld 在 RELATIVE 分支 panic（实测退出码 101）。135 KB 那版能跑通。
+    # 代价：`compiler_builtins` 提供的**弱符号**数学函数（sqrt/floor/pow…）会被裁掉——
+    # 「无人内部引用」+ version script 不创建引用。这是**已记录的独立待查项**，不影响导出面里的
+    # C ABI 函数（printf/malloc/snprintf/…）。
     run([lld, "-shared", "-soname", SONAME, "-z", "norelro", "--gc-sections",
          "--version-script=" + os.path.join(LIBC, "abi-exports.txt"),
-         "--whole-archive", a, "--no-whole-archive",
-         "-o", out])
+         "--whole-archive", a, "--no-whole-archive"]
+        + keep +
+        ["-o", out])
     print("[build_so] 产出", out, "(%d KB)" % (os.path.getsize(out) // 1024))
 
 
