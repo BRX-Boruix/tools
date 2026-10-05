@@ -201,9 +201,9 @@ def cmd(args) -> int:
     # POSIX 聚合头）。合并进同一个 include/ 会静默覆盖其一——宁可少给一份，也不给错的一份。
     # freestanding C 运行时（crtrt.c 那一族）由 csrc/build_c.py 自带 -I 使用，不经 sysroot。
     inc_src = os.path.join(config.PROJECT_ROOT, "libc", "include")
-    for name in sorted(os.listdir(inc_src)):
-        if name.endswith(".h"):
-            shutil.copy(os.path.join(inc_src, name), os.path.join(inc_dir, name))
+    # **递归**拷贝：POSIX 头有 sys/ 子目录（sys/mman.h、sys/stat.h、sys/types.h）；
+    # 此前只 listdir 一层，子目录会被静默漏掉——那种「库在、头不在」的缺口最难查。
+    shutil.copytree(inc_src, inc_dir, dirs_exist_ok=True)
     shutil.copy(os.path.join(config.PROJECT_ROOT, "csrc", "linker.ld"),
                 os.path.join(lib_dir, "linker.ld"))
 
