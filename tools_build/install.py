@@ -125,8 +125,8 @@ build-std = ["core", "alloc"]
 """
 
 
-def _run(cmd, cwd=None):
-    r = subprocess.run(cmd, cwd=cwd or config.PROJECT_ROOT)
+def _run(cmd, cwd=None, env=None):
+    r = subprocess.run(cmd, cwd=cwd or config.PROJECT_ROOT, env=env)
     if r.returncode != 0:
         err("命令失败（%d）: %s" % (r.returncode, " ".join(cmd)))
     return r.returncode
@@ -159,13 +159,30 @@ def cmd(args) -> int:
     for d in (lib_dir, inc_dir, bin_dir):
         os.makedirs(d, exist_ok=True)
 
-    info("编译 libc.a (%s)" % profile)
+    # **必须用用户态目标构建 libc.a**：C 程序由 clang 按**硬件 SSE 浮点 ABI** 编译；若库用内核的
+    # soft-float 目标（x86_64-unknown-none，`-sse...+soft-float`）构建，则任何跨 C↔Rust 边界的
+    # double 都是坏的——实测 sqrt/floor/ceil/fabs/pow 与 printf("%.1f") 全部 FAIL，而同程序的
+    # ctype/string/stdlib 全过（是 ABI 不是符号缺失）。
+    target_name = "x86_64-unknown-boruix"
+    target_dir = os.path.join(config.PROJECT_ROOT, "sdk")
+    if not os.path.isfile(os.path.join(target_dir, target_name + ".json")):
+        err("未找到用户态目标规格: " + os.path.join(target_dir, target_name + ".json"))
+        return 1
+    env = dict(os.environ)
+    env["RUST_TARGET_PATH"] = target_dir
+    # 目标域 rustflags：自定义目标要 -Zunstable-options；TLS 模型是本系统正确性的硬要求。
+    env["CARGO_TARGET_X86_64_UNKNOWN_BORUIX_RUSTFLAGS"] = (
+        "-Zunstable-options -Ztls-model=local-exec"
+    )
+    info("编译 libc.a (%s, 目标 %s)" % (profile, target_name))
     rc = _run(["cargo", "build",
                "--manifest-path", os.path.join(config.PROJECT_ROOT, "libc", "Cargo.toml"),
-               "--target", config.TARGET] + (["--release"] if profile == "release" else []))
+               "-Z", "build-std=core,alloc",
+               "--target", target_name] + (["--release"] if profile == "release" else []),
+              env=env)
     if rc != 0:
         return rc
-    src_a = os.path.join(config.PROJECT_ROOT, "libc", "target", config.TARGET, profile, "liblibc.a")
+    src_a = os.path.join(config.PROJECT_ROOT, "libc", "target", target_name, profile, "liblibc.a")
     if not os.path.isfile(src_a):
         err("未找到 liblibc.a: " + src_a)
         return 1
