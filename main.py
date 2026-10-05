@@ -7,6 +7,7 @@ BORUIX 系统工具统一入口（系统集成、构建与验收）。
 
 子命令:
     build    编译内核并生成可引导 ISO（x86_64）（Limine 引导完全走 brxLimine fork）
+    install  产出第三方 sysroot（3P1-2）
     run      用 QEMU 启动 ISO
     br       Build and Run：编译生成 ISO 后立即用 QEMU 启动
     --help   查看帮助
@@ -17,7 +18,7 @@ BORUIX 系统工具统一入口（系统集成、构建与验收）。
 import argparse
 import sys
 
-from tools_build import b3p, br, build, config, disk, elf_image, limine_build, run
+from tools_build import b3p, br, build, config, disk, elf_image, install, limine_build, run
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -407,6 +408,26 @@ def build_parser() -> argparse.ArgumentParser:
         help="改为列出全部节名",
     )
     p_where.set_defaults(func=elf_image.cmd)
+
+    # install 子命令：产出可交付给第三方的 sysroot（3P1-2）。
+    #
+    # 这是「分发解耦」的交付面：第三方拿到 <prefix> 后，C 程序一条 boruix-clang 即可
+    # 编出可运行 ELF，Rust 工程用 <prefix>/cargo-config.toml 即可，**无需克隆系统源码**。
+    p_install = sub.add_parser(
+        "install",
+        help="产出第三方 sysroot（头文件 + libc.a + 链接脚本 + C 驱动 + 目标定义）",
+    )
+    p_install.add_argument(
+        "--prefix",
+        required=True,
+        help="安装根目录（可不存在；已存在则就地更新，不删除无关文件）",
+    )
+    p_install.add_argument(
+        "--debug",
+        action="store_true",
+        help="以 debug 配置构建 libc.a（默认 release：交付物形态）",
+    )
+    p_install.set_defaults(func=install.cmd)
 
     return parser
 
