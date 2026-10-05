@@ -27,7 +27,7 @@ DRIVER_TEMPLATE = r'''#!/usr/bin/env python3
 """boruix-clang - 用本 sysroot 把一个 C 程序编成可运行的 BORUIX ELF。
 
 用法:
-    boruix-clang hello.c            # 产出 ./hello.elf
+    boruix-clang hello.c            # 产出 ./hello.elf（默认名取自源文件）
     boruix-clang hello.c -o out.elf
 
 sysroot 由 `python tools/main.py install --prefix <dir>` 生成；本脚本通过自身路径
@@ -65,12 +65,14 @@ def _pick(env_key, default, name):
 
 def main(argv):
     srcs = [a for a in argv if not a.startswith("-") and a.endswith(".c")]
-    out = "hello.elf"
-    if "-o" in argv:
-        out = argv[argv.index("-o") + 1]
     if not srcs:
         sys.stderr.write(__doc__)
         return 1
+    # 默认产物名取**第一个源文件**的名字（foo.c -> foo.elf）。此前写死 hello.elf，于是
+    # `boruix-clang wclite.c` 会产出 hello.elf，容易被误当成别的程序。
+    out = os.path.splitext(os.path.basename(srcs[0]))[0] + ".elf"
+    if "-o" in argv:
+        out = argv[argv.index("-o") + 1]
     clang = _pick("BORUIX_CLANG", DEFAULT_CLANG, "clang")
     lld = _pick("BORUIX_LLD", DEFAULT_LLD, "ld.lld")
     cc = [clang, "--target=x86_64-unknown-none", "-ffreestanding", "-fno-builtin",
