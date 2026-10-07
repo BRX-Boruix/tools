@@ -377,6 +377,36 @@ int main(void) {
         unlink("/scratch/sp_out.txt");
     }
 
+    /* ---- fnmatch 的 GNU 扩展旗标 + _getopt_internal（GCC 自带 libiberty 在要）---- */
+    {
+        chk(FNM_FILE_NAME == FNM_PATHNAME, "FNM_FILE_NAME 是 FNM_PATHNAME 的别名（同值）");
+        chk(fnmatch("*.c", "FOO.C", FNM_CASEFOLD) == 0, "fnmatch FNM_CASEFOLD 大小写不敏感");
+        chk(fnmatch("*.c", "FOO.C", 0) == FNM_NOMATCH, "对照：不带 CASEFOLD 时大小写敏感");
+        chk(fnmatch("a/*", "a/b/c", FNM_PATHNAME) == FNM_NOMATCH,
+            "FNM_PATHNAME（FNM_FILE_NAME 同义）下 * 不跨 /");
+        chk(fnmatch("a", "a/b/c", FNM_LEADING_DIR) == 0,
+            "fnmatch FNM_LEADING_DIR 匹配到 / 边界即命中");
+        chk(fnmatch("a", "ab/c", FNM_LEADING_DIR) == FNM_NOMATCH,
+            "fnmatch FNM_LEADING_DIR 不匹配非边界的同前缀");
+    }
+    {
+        static struct option lo2[] = {
+            { "alpha", no_argument, NULL, 'a' },
+            { NULL, 0, NULL, 0 },
+        };
+        char *av3[] = { (char *)"prog", (char *)"--alpha", NULL };
+        optind = 1;
+        chk(_getopt_internal(2, av3, "", lo2, NULL, 0) == 'a',
+            "_getopt_internal(longopts!=NULL) 走长选项");
+        char *av4[] = { (char *)"prog", (char *)"-x", NULL };
+        optind = 1;
+        chk(_getopt_internal(2, av4, "x", NULL, NULL, 0) == 'x',
+            "_getopt_internal(longopts==NULL) 走短选项（S15 共同核心）");
+        optind = 1;
+        chk(_getopt_internal(2, av4, "x", NULL, NULL, 1) == -1,
+            "_getopt_internal(long_only=1) 如实拒绝（GNU 扩展未实现）");
+    }
+
     /* ---- on_exit / atexit（顺序证据在处理器里打印） ---- */
     chk(on_exit(h_onexit, (void *)"onexit-arg") == 0, "on_exit 登记成功");
     chk(atexit(h_atexit) == 0, "atexit 登记成功");
