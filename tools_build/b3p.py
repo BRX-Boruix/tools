@@ -75,6 +75,9 @@ DEFAULT_PROFILE = "release"
 SOURCE_PACKAGES = (
     "cowsay",
     "bxls",
+    # libcc1：3P6-2 第二波（C1 批）的**系统内运行时验收**——反向对账只证明符号存在与声明齐全，
+    # 证明不了行为对；本包在系统内用 tcc 真跑一遍每个 C1 项。
+    "libcc1",
 )
 
 # 源码包在**本仓**（tools）下的目录名。
