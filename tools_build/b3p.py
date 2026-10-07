@@ -74,6 +74,7 @@ DEFAULT_PROFILE = "release"
 #   - `BUILD`：在**机内**执行的构建命令（逐行、可直接粘进 shell）。
 SOURCE_PACKAGES = (
     "cowsay",
+    "bxls",
 )
 
 # 源码包在**本仓**（tools）下的目录名。
