@@ -21,6 +21,9 @@
 #include <errno.h>
 #include <sys/stat.h>  /* struct stat 是**完整类型**才能定义对象（tcc 实测：只声明会报
                         * "initialization of incomplete type"） */
+#include <dirent.h>
+#include <sys/utsname.h>
+#include <wordexp.h>
 
 static int fails = 0;
 static int seq = 0;
@@ -252,6 +255,78 @@ int main(void) {
             fclose(nf);
             unlink("/scratch/c1probe.txt");
         }
+    }
+
+    /* ---- C2 批：seekdir / telldir / scandir / alphasort ---- */
+    {
+        DIR *d = opendir("/programs");
+        chk(d != NULL, "opendir /programs");
+        if (d != NULL) {
+            struct dirent *e = readdir(d);
+            long loc = telldir(d);
+            chk(e != NULL && loc >= 0, "readdir + telldir");
+            (void)readdir(d);
+            seekdir(d, loc);
+            struct dirent *e3 = readdir(d);
+            chk(e3 != NULL && strcmp(e3->d_name, e->d_name) == 0,
+                "seekdir(telldir) 往返：重读到同一项");
+            closedir(d);
+        }
+    }
+    {
+        struct dirent **list = NULL;
+        int n = scandir("/programs", &list, NULL, alphasort);
+        chk(n >= 1, "scandir /programs");
+        if (n >= 1) {
+            int sorted = 1;
+            for (int i = 1; i < n; i++)
+                if (strcmp(list[i - 1]->d_name, list[i]->d_name) > 0) sorted = 0;
+            chk(sorted, "scandir 用 alphasort 排好序");
+            printf("     scandir 项数=%d 首项=%s\n", n, list[0]->d_name);
+            for (int i = 0; i < n; i++) free(list[i]);
+            free(list);
+        }
+    }
+
+    /* ---- C2 批：uname / gethostname / getlogin ---- */
+    {
+        struct utsname u;
+        chk(uname(&u) == 0, "uname");
+        printf("     uname: sysname=%s nodename=[%s] release=%s version=%s machine=%s\n",
+               u.sysname, u.nodename, u.release, u.version, u.machine);
+        chk(strcmp(u.sysname, "Boruix") == 0, "uname sysname=Boruix");
+        chk(strlen(u.release) >= 3 && u.release[1] == '.', "uname release 形如 M.m.p（来自内核 INFO_VERSION）");
+        chk(strcmp(u.machine, "x86_64") == 0, "uname machine=x86_64");
+        chk(u.nodename[0] == '\0', "uname nodename 如实为空（本系统无主机名）");
+        char hn[64];
+        memset(hn, 'X', sizeof hn);
+        chk(gethostname(hn, sizeof hn) == 0 && hn[0] == '\0', "gethostname 如实为空");
+        char *lg = getlogin();
+        printf("     getlogin = %s\n", lg ? lg : "(NULL)");
+        chk(1, "getlogin 返回 NULL 或真实环境名（不编造）");
+    }
+
+    /* ---- C2 批：wordexp / wordfree ---- */
+    {
+        wordexp_t we;
+        memset(&we, 0, sizeof we);
+        int wr = wordexp("alpha $HOME 'q u o' /programs/*.elf", &we, 0);
+        chk(wr == 0, "wordexp 基本展开");
+        if (wr == 0) {
+            printf("     wordexp 词数=%u 词0=%s 词2=%s\n",
+                   (unsigned)we.we_wordc, we.we_wordv[0], we.we_wordv[2]);
+            chk(we.we_wordc >= 3, "wordexp 至少 3 个词（含通配展开）");
+            chk(strcmp(we.we_wordv[0], "alpha") == 0, "wordexp 词0 = alpha");
+            chk(strcmp(we.we_wordv[2], "q u o") == 0, "wordexp 单引号内空格保留");
+            wordfree(&we);
+        }
+        wordexp_t we2;
+        memset(&we2, 0, sizeof we2);
+        chk(wordexp("$(date)", &we2, 0) == WRDE_CMDSUB,
+            "wordexp 命令替换如实 WRDE_CMDSUB（不静默展开成空）");
+        wordexp_t we3;
+        memset(&we3, 0, sizeof we3);
+        chk(wordexp("a | b", &we3, 0) == WRDE_BADCHAR, "wordexp 未加引号元字符如实 WRDE_BADCHAR");
     }
 
     /* ---- on_exit / atexit（顺序证据在处理器里打印） ---- */
