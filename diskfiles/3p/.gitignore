@@ -2,5 +2,7 @@
 # tcc 在系统内运行所需的资产（头文件 / crt / 库）：由
 # tcc-on-boruix/boruix/stage_assets.py 生成，不入库。
 /tcc/
-# tcc 验收夹具的磁盘副本（正本在 tcc-on-boruix/tests/hello.c）。
+# tcc 验收/驱动夹具的磁盘副本（正本在 tcc-on-boruix/tests/）：由
+# tcc-on-boruix/boruix/stage_assets.py 拷入，不入库。
 /hello.c
+/wave2.c
