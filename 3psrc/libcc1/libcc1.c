@@ -200,6 +200,26 @@ int main(void) {
         }
     }
 
+    /* ---- 探针 2：**绕过 FILE 层**，直接用 open/lseek/close 检验「close 是否清了位置表」。
+     * 若刚打开的 fd2 上 lseek(CUR) 返回旧位置（而不是 -1/ENOTSUP），说明清理本身没生效。 */
+    {
+        int fd = open("/scratch/c1pos.txt", O_RDWR | O_CREAT | O_TRUNC, 0600);
+        if (fd >= 0) {
+            char tmp8[8] = "abcdefgh";
+            write(fd, tmp8, 8);
+            lseek(fd, 5, SEEK_SET);
+            close(fd);
+            int fd2 = open("/scratch/c1pos.txt", O_RDWR, 0600);
+            errno = 0;
+            long p = lseek(fd2, 0, SEEK_CUR);
+            int pe = errno;
+            printf("     探针2: fd=%d fd2=%d lseek(CUR 刚打开)=%ld errno=%d (期望 -1/95)\n",
+                   fd, fd2, p, pe);
+            close(fd2);
+            unlink("/scratch/c1pos.txt");
+        }
+    }
+
     /* ---- 对照实验：同一「写 → fseek(0) → 读回」序列在**普通文件**上 ----
      * 用途：把「定位读本身有问题」与「unlink 之后写入不可见」两种假设分开。
      * 结论（实测）：普通文件**能**读回；故根因是后者，tmpfile 因此改为延迟删除。 */
@@ -210,6 +230,13 @@ int main(void) {
         FILE *nf = fopen("/scratch/c1probe.txt", "w+");
         chk(nf != NULL, "fopen w+ 普通文件");
         if (nf != NULL) {
+            /* 关键探针：**刚 fopen 完**就 ftell。若它返回 13（而不是 -1/ENOTSUP），
+             * 说明该 fd 号上残留着上一个流的位置 —— 即 close 的清理没生效；
+             * 若返回 -1，则位置表是干净的，写落错偏移的原因在别处。 */
+            long pre = ftell(nf);
+            int pre_errno = errno;
+            printf("     对照探针: fileno(nf)=%d ftell(fopen 后)=%ld errno=%d\n",
+                   fileno(nf), pre, pre_errno);
             const char *m2 = "hello-normal";
             size_t w2 = fwrite(m2, 1, strlen(m2), nf);
             int s2 = fseek(nf, 0, SEEK_SET);
