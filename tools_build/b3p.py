@@ -59,9 +59,84 @@ THIRD_PARTY_SUBDIR = "3p"
 DEFAULT_PROFILE = "release"
 
 
+# 源码包清单（3P6-5「分发模型扩展」）：**以源码分发、在机编译**的包。
+#
+# 与 THIRD_PARTY_PROGRAMS 的区别（两条并行的分发通道）：
+# | | THIRD_PARTY_PROGRAMS | SOURCE_PACKAGES |
+# |---|---|---|
+# | 盘上形态 | `3p/<name>.elf`（宿主预编译） | `3p/src/<name>/`（源码 + 构建配方） |
+# | 谁来编译 | 宿主 cargo（交叉编译） | **机上的系统内编译器**（tcc） |
+# | 适用 | 需要 Rust 工具链的第三方程序 | 能在机编译的 C（及其他）源码包 |
+#
+# 元素为项目根下的目录名（`3psrc/<name>/`），目录内容被**整体**拷到
+# `tools/diskfiles/3p/src/<name>/`。约定（S15 单点，写在包的 BUILD 文件里）：
+#   - `<name>.c`：入口源文件；
+#   - `BUILD`：在**机内**执行的构建命令（逐行、可直接粘进 shell）。
+SOURCE_PACKAGES = (
+    "cowsay",
+)
+
+# 源码包在**本仓**（tools）下的目录名。
+#
+# 为什么放在 tools 仓而不是项目根：tools 仓已经是「要分发什么」的唯一持有者
+# （diskfiles/ 就是盘内容来源），源码包同理——放这里既版本化、又能随本仓推送，
+# 不必为每个包新开一个仓。
+SOURCE_PACKAGE_ROOT = os.path.join(config.TOOLS_DIR, "3psrc")
+
+
 def _diskfiles_3p_dir() -> str:
     """第三方程序在 diskfiles 下的产出目录（`tools/diskfiles/3p`）。"""
     return os.path.join(config.TOOLS_DIR, "diskfiles", THIRD_PARTY_SUBDIR)
+
+
+def _diskfiles_3p_src_dir() -> str:
+    """源码包在 diskfiles 下的产出目录（`tools/diskfiles/3p/src`）。"""
+    return os.path.join(_diskfiles_3p_dir(), "src")
+
+
+def stage_source(name: str) -> int:
+    """把一个**源码包**整体铺到 `diskfiles/3p/src/<name>/`。返回 0 成功。
+
+    **只拷源码，不编译**——这正是本通道的意义：编译发生在 BORUIX 机内
+    （由系统内编译器执行包里的 `BUILD` 配方），宿主只负责分发源码。
+    """
+    src_dir = os.path.join(SOURCE_PACKAGE_ROOT, name)
+    if not os.path.isdir(src_dir):
+        err(f"源码包目录不存在: {src_dir}")
+        return 1
+    entry = os.path.join(src_dir, name + ".c")
+    if not os.path.isfile(entry):
+        err(f"源码包缺少入口源文件: {entry}")
+        return 1
+    if not os.path.isfile(os.path.join(src_dir, "BUILD")):
+        err(f"源码包缺少构建配方 BUILD: {src_dir}")
+        return 1
+    dst = os.path.join(_diskfiles_3p_src_dir(), name)
+    shutil.rmtree(dst, ignore_errors=True)
+    shutil.copytree(src_dir, dst)
+    n = sum(len(f) for _r, _d, f in os.walk(dst))
+    info(f"源码包 {name} -> {dst} ({n} 个文件，未编译；编译在机内按 BUILD 执行)")
+    return 0
+
+
+def stage_sources(only=None) -> int:
+    """铺全部（或指定的）源码包。返回 0 表示全部成功。"""
+    names = list(SOURCE_PACKAGES)
+    if only:
+        unknown = [n for n in only if n not in SOURCE_PACKAGES]
+        if unknown:
+            err(f"不在源码包清单中的名字: {unknown}")
+            err(f"清单: {list(SOURCE_PACKAGES)}")
+            return 1
+        names = [n for n in names if n in set(only)]
+    if not names:
+        info("源码包清单为空，无事可做")
+        return 0
+    for name in names:
+        rc = stage_source(name)
+        if rc != 0:
+            return rc
+    return 0
 
 
 def _elf_path(name: str, profile: str) -> str:
@@ -217,6 +292,11 @@ def cmd(args: argparse.Namespace) -> int:
     if getattr(args, "list", False):
         for n in THIRD_PARTY_PROGRAMS:
             print(n)
+        for n in SOURCE_PACKAGES:
+            print(n + "  (源码包)")
         return 0
+    # --src：走"源码包"通道——只铺源码，编译在 BORUIX 机内做（3P6-5）。
+    if getattr(args, "src", False):
+        return stage_sources(only=getattr(args, "prog", None))
     profile = "debug" if getattr(args, "debug", False) else DEFAULT_PROFILE
     return build_all(profile, only=getattr(args, "prog", None))

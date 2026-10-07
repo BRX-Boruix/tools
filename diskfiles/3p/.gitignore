@@ -6,3 +6,5 @@
 # tcc-on-boruix/boruix/stage_assets.py 拷入，不入库。
 /hello.c
 /wave2.c
+# 源码包分发目录（3P6-5）：由 `python tools/main.py b3p --src` 从 tools/3psrc/ 铺入。
+/src/

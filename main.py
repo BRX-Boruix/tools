@@ -376,7 +376,14 @@ def build_parser() -> argparse.ArgumentParser:
     p_b3p.add_argument(
         "--list",
         action="store_true",
-        help="只列出第三方程序清单，不构建",
+        help="只列出第三方程序与源码包清单，不构建",
+    )
+    # --src：走"源码包"通道（3P6-5）——只把源码铺到 3p/src/<name>/，**不编译**；
+    # 编译由系统内编译器在 BORUIX 机内按包里的 BUILD 配方完成。
+    p_b3p.add_argument(
+        "--src",
+        action="store_true",
+        help="分发源码包（只铺源码到 3p/src/<name>/，编译在机内做；清单见 b3p.py 的 SOURCE_PACKAGES）",
     )
     # --new：生成最小可编译骨架（3P1-6）。生成**现代形态**——无 build.rs、无 linker.ld，
     # 目标定义/链接脚本/TLS 模型全部来自 sysroot 的 cargo 配置。
