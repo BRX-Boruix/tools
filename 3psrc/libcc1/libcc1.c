@@ -19,6 +19,8 @@
 #include <time.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <sys/stat.h>  /* struct stat 是**完整类型**才能定义对象（tcc 实测：只声明会报
+                        * "initialization of incomplete type"） */
 
 static int fails = 0;
 static int seq = 0;
@@ -202,6 +204,9 @@ int main(void) {
      * 用途：把「定位读本身有问题」与「unlink 之后写入不可见」两种假设分开。
      * 结论（实测）：普通文件**能**读回；故根因是后者，tmpfile 因此改为延迟删除。 */
     {
+        // **先删干净**：/scratch 在带系统盘启动时跨重启持久（内核 vfs_init 成文），
+        // 上一次运行残留的旧文件会让「截断 + 写入」的观测被历史字节污染。
+        unlink("/scratch/c1probe.txt");
         FILE *nf = fopen("/scratch/c1probe.txt", "w+");
         chk(nf != NULL, "fopen w+ 普通文件");
         if (nf != NULL) {
