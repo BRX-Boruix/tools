@@ -24,6 +24,8 @@
 #include <dirent.h>
 #include <sys/utsname.h>
 #include <wordexp.h>
+#include <spawn.h>
+#include <sys/wait.h>
 
 static int fails = 0;
 static int seq = 0;
@@ -327,6 +329,52 @@ int main(void) {
         wordexp_t we3;
         memset(&we3, 0, sizeof we3);
         chk(wordexp("a | b", &we3, 0) == WRDE_BADCHAR, "wordexp 未加引号元字符如实 WRDE_BADCHAR");
+    }
+
+    /* ---- posix_spawn：GCC 宿主端口的解锁项（基座是 SYS_TASK_SPAWN，不是 DERIVE）---- */
+    {
+        pid_t p = -1;
+        char *av[] = { (char *)"selftest.elf", (char *)"--exit-now", NULL };
+        int rc = posix_spawn(&p, "/programs/selftest.elf", NULL, NULL, av, NULL);
+        chk(rc == 0 && p > 0, "posix_spawn 成功并返回子进程 pid");
+        if (rc == 0) {
+            int st = 0;
+            pid_t w = waitpid(p, &st, 0);
+            chk(w == p && WIFEXITED(st) && WEXITSTATUS(st) == 0,
+                "posix_spawn 的子进程可被 waitpid 收尸且退出码 0");
+        }
+        /* 参数含空格：本 ABI 无法无损表达 ⇒ 必须如实 EINVAL，不静默切成两个参数 */
+        char *av2[] = { (char *)"x", (char *)"a b", NULL };
+        rc = posix_spawn(&p, "/programs/selftest.elf", NULL, NULL, av2, NULL);
+        chk(rc == EINVAL, "posix_spawn 参数含空格如实 EINVAL（不静默切词）");
+        /* 不支持的 attrp 旗标：如实 ENOSYS，不静默忽略 */
+        posix_spawnattr_t at;
+        posix_spawnattr_init(&at);
+        chk(posix_spawnattr_setflags(&at, POSIX_SPAWN_SETSIGMASK) == ENOSYS,
+            "posix_spawnattr_setflags 不支持位如实 ENOSYS");
+        chk(posix_spawnattr_setflags(&at, POSIX_SPAWN_RESETIDS) == 0,
+            "posix_spawnattr_setflags RESETIDS 可接受（本系统里是无操作）");
+        posix_spawnattr_destroy(&at);
+    }
+    /* file_actions：把子进程 fd1 重定向到文件，**派生后父进程 fd1 必须还原**——
+     * 下面那行 ok 若出现在串口日志里，本身就是「已还原」的证明（否则它会写进文件）。 */
+    {
+        posix_spawn_file_actions_t fa;
+        posix_spawn_file_actions_init(&fa);
+        int ar = posix_spawn_file_actions_addopen(&fa, 1, "/scratch/sp_out.txt",
+                                                  O_WRONLY | O_CREAT | O_TRUNC, 0600);
+        chk(ar == 0, "posix_spawn_file_actions_addopen 登记成功");
+        pid_t p = -1;
+        char *av[] = { (char *)"selftest.elf", (char *)"--exit-now", NULL };
+        int rc = posix_spawn(&p, "/programs/selftest.elf", &fa, NULL, av, NULL);
+        chk(rc == 0, "posix_spawn + file_actions(addopen fd1) 派生成功");
+        if (rc == 0) {
+            int st = 0;
+            waitpid(p, &st, 0);
+        }
+        posix_spawn_file_actions_destroy(&fa);
+        chk(1, "file_actions 后父进程 fd1 已还原（本行能出现在串口即为证）");
+        unlink("/scratch/sp_out.txt");
     }
 
     /* ---- on_exit / atexit（顺序证据在处理器里打印） ---- */

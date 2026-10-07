@@ -20,6 +20,13 @@
 **诚实边界**：语法正确 ≠ 与 Rust 侧的 `#[repr(C)]` 布局一致，也 ≠ 行为正确。
 本门只挡「拼写/缺类型/自相矛盾的声明」这一类——它们恰好是最容易犯、又最贵的错。
 
+**本门查不出的（如实声明，2026-10 实测）**：
+  - **缺宏**：我给 `errno.rs` 加了 `ENOSYS` 却忘了同步 `include/errno.h`——头文件本身语法完好，
+    本门全绿，直到 `libcc1.c` 用 tcc 编译时才报 `'ENOSYS' undeclared`。
+    这类「C 程序用到的宏没定义」只能靠**真实 C 程序**（`tools/3psrc/libcc1`）挡。
+  - **Rust/C 两侧布局不一致**（两边各自都能编译）。
+故本门与「系统内运行时验收」是**互补**的两道，不是替代关系。
+
 用法:
     set BORUIX_SYSROOT=<install --prefix 的产物>
     python tools/checks/dist/headers_syntax.py [--sysroot <dir>] [--clang <exe>]
