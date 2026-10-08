@@ -56,8 +56,22 @@ def main():
         print("[FAIL] sysroot 里没有 include/: " + inc)
         return 2
 
+    # 只检查 **C 头文件**：`c++/` 下是 libstdc++ 的头，属于另一种语言——
+    # 用 C TU 去 include 它们必然失败（`namespace` / `#include_next` / 需要
+    # `bits/c++config.h`），那不是本门要管的事。它们由 C++ 编译器在 libstdc++
+    # 构建/使用时校验。2026-10：libstdc++ 的头被铺进 sysroot 后本门从 33 个涨到
+    # 361 个并报了 327 个假失败，故在此显式剪枝（不是把失败藏起来：下面会打印跳过数）。
     headers = []
-    for root, _dirs, files in os.walk(inc):
+    skipped_cxx = []
+    for root, dirs, files in os.walk(inc):
+        keep = []
+        for d in dirs:
+            if d == "c++":
+                for r2, _d2, f2 in os.walk(os.path.join(root, d)):
+                    skipped_cxx.extend(x for x in f2 if x.endswith(".h"))
+            else:
+                keep.append(d)
+        dirs[:] = keep
         for f in files:
             if f.endswith(".h"):
                 rel = os.path.relpath(os.path.join(root, f), inc).replace(os.sep, "/")
@@ -78,7 +92,8 @@ def main():
             if r.returncode != 0:
                 bad.append((rel, r.stderr.strip().splitlines()[:3]))
 
-    print("[headers] 检查 %d 个头文件（各一个 TU）" % len(headers))
+    print("[headers] 检查 %d 个 C 头文件（各一个 TU）；跳过 %d 个 C++ 头（非本门范围）"
+          % (len(headers), len(skipped_cxx)))
     if not bad:
         print("[OK] 全部通过")
         return 0

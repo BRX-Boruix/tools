@@ -26,6 +26,7 @@
 #include <wordexp.h>
 #include <spawn.h>
 #include <sys/wait.h>
+#include <math.h>
 
 /* ---- C++ 静态构造（.init_array）探针：这是 libstdc++ 的**前置地基** ----
  * 现在 Boruix 的入口链路（libsys 的 _start -> user_main -> main）**不遍历 .init_array**，
@@ -47,6 +48,13 @@ static void chk(int cond, const char *what) {
         printf("FAIL %s\n", what);
         fails++;
     }
+}
+
+/* 把 double 的**位模式**取出来：机内断言与宿主真 libm 逐位比较，避免任何十进制解析歧义。 */
+static unsigned long long bits_of(double d) {
+    union { double d; unsigned long long u; } x;
+    x.d = d;
+    return x.u;
 }
 
 static void h_atexit(void) {
@@ -421,6 +429,49 @@ int main(void) {
     /* ---- on_exit / atexit（顺序证据在处理器里打印） ---- */
     chk(on_exit(h_onexit, (void *)"onexit-arg") == 0, "on_exit 登记成功");
     chk(atexit(h_atexit) == 0, "atexit 登记成功");
+
+    /* ---- 数学库（3P3-2 精度重做，B 档 ≤1 ulp）----
+     * 参考值是**宿主真 libm** 的逐位结果，由 tools/checks/math_verify/spots.rs 生成：
+     * 只有"我们的核心"与宿主 libm **逐位一致**的抽样点才被输出，否则不输出。
+     * 故下面每一条都是**真值断言**，不是自证。
+     * 另有 11 个抽样点与宿主 libm 差 1 ulp（在 B 档允许内），按规则未输出。 */
+    chk(bits_of(sqrt(2.0)) == 0x3ff6a09e667f3bcdULL, "sqrt(2.0)");
+    chk(bits_of(sqrt(0.125)) == 0x3fd6a09e667f3bcdULL, "sqrt(0.125)");
+    chk(bits_of(sqrt(1e-300)) == 0x20ca2fe76a3f9475ULL, "sqrt(1e-300)");
+    chk(bits_of(cbrt(27.0)) == 0x4008000000000000ULL, "cbrt(27.0)");
+    chk(bits_of(cbrt(1000.0)) == 0x4024000000000000ULL, "cbrt(1000.0)");
+    chk(bits_of(cbrt(-8.0)) == 0xc000000000000000ULL, "cbrt(-8.0)");
+    chk(bits_of(pow(1e8, 1.5)) == 0x426d1a94a2000000ULL, "pow(1e8, 1.5)");
+    chk(bits_of(pow(2.0, 10.0)) == 0x4090000000000000ULL, "pow(2.0, 10.0)");
+    chk(bits_of(pow(-2.0, 3.0)) == 0xc020000000000000ULL, "pow(-2.0, 3.0)");
+    chk(bits_of(pow(2.0, -1.0)) == 0x3fe0000000000000ULL, "pow(2.0, -1.0)");
+    chk(bits_of(pow(3.0, 0.5)) == 0x3ffbb67ae8584caaULL, "pow(3.0, 0.5)");
+    chk(bits_of(log2(1024.0)) == 0x4024000000000000ULL, "log2(1024.0)");
+    chk(bits_of(log2(0.5)) == 0xbff0000000000000ULL, "log2(0.5)");
+    chk(bits_of(log2(8.571428571428571e-1)) == 0xbfcc775ad842578dULL, "log2(0.8571428571428571)");
+    chk(bits_of(log(1.0)) == 0x0000000000000000ULL, "log(1.0)");
+    chk(bits_of(log10(1000.0)) == 0x4008000000000000ULL, "log10(1000.0)");
+    chk(bits_of(log1p(0.5)) == 0x3fd9f323ecbf984cULL, "log1p(0.5)");
+    chk(bits_of(sin(0.5)) == 0x3fdeaee8744b05f0ULL, "sin(0.5)");
+    chk(bits_of(cos(0.5)) == 0x3fec1528065b7d50ULL, "cos(0.5)");
+    chk(bits_of(tan(0.5)) == 0x3fe17b4f5bf3474aULL, "tan(0.5)");
+    chk(bits_of(asin(0.5)) == 0x3fe0c152382d7366ULL, "asin(0.5)");
+    chk(bits_of(asin(4.2857142857142855e-1)) == 0x3fdc58a7905557f6ULL, "asin(0.42857142857142855)");
+    chk(bits_of(asin(0.9999)) == 0x3ff8e80e1a01556aULL, "asin(0.9999)");
+    chk(bits_of(atan(1.0)) == 0x3fe921fb54442d18ULL, "atan(1.0)");
+    chk(bits_of(atan2(1.0, 1.0)) == 0x3fe921fb54442d18ULL, "atan2(1.0, 1.0)");
+    chk(bits_of(sinh(1.0)) == 0x3ff2cd9fc44eb982ULL, "sinh(1.0)");
+    chk(bits_of(tanh(1.0)) == 0x3fe85efab514f394ULL, "tanh(1.0)");
+    chk(bits_of(hypot(3.0, 4.0)) == 0x4014000000000000ULL, "hypot(3.0, 4.0)");
+    chk(bits_of(hypot(1e300, 1e300)) == 0x7e40e4d50f99b211ULL, "hypot(1e300, 1e300) 不溢出");
+    chk(bits_of(fmod(7.0, 3.0)) == 0x3ff0000000000000ULL, "fmod(7.0, 3.0)");
+    chk(bits_of(floor(-2.5)) == 0xc008000000000000ULL, "floor(-2.5)");
+    chk(bits_of(ceil(-2.5)) == 0xc000000000000000ULL, "ceil(-2.5)");
+    chk(bits_of(trunc(-2.5)) == 0xc000000000000000ULL, "trunc(-2.5)");
+    chk(bits_of(round(-2.5)) == 0xc008000000000000ULL, "round(-2.5)");
+    chk(bits_of(fabs(-3.5)) == 0x400c000000000000ULL, "fabs(-3.5)");
+    chk(bits_of(nearbyint(2.5)) == 0x4000000000000000ULL, "nearbyint(2.5) 就近偶数");
+    chk(bits_of(nextafter(1.0, 2.0)) == 0x3ff0000000000001ULL, "nextafter(1.0, 2.0)");
 
     printf("libcc1 checks: fails=%d\n", fails);
     /* 显式 exit 而不是 return：确保退出处理器一定被执行（不依赖 crt 的返回路径）。 */

@@ -197,9 +197,43 @@ def _alloc_file_blocks(alloc, size):
     return i_block, total_sectors
 
 
+def _dir_rec_len(name):
+    """EXT2 目录条目占用的字节数（名字 + 8B 头，4 字节对齐）。"""
+    return (8 + len(name.encode("utf-8")) + 3) & ~3
+
+
+def _split_dir_blocks(entries):
+    """把目录条目按 **1024B 块** 切分（每块最后一条的 rec_len 由写入器补到块尾）。
+    返回 [[条目, ...], ...]。
+
+    **为什么需要**：EXT2 的目录就是"条目数组"，条目多了就是**多块目录**。本函数之前不存在——
+    调用方假设"目录一定装得下一块"。2026-10 实测：一个 800+ 文件的目录（libstdc++ 的头被误铺进
+    `tcc/include`）把它撑爆，报的却是 `struct.error: pack_into requires a buffer of at least
+    1028 bytes`——一个与真实原因（目录太大）毫无关系的错。现在两处都修：这里切块，
+    写入器也如实报错。`tcc/include` 那一侧另有修复（`stage_assets.py` 不再铺 `c++/`）。
+    """
+    blocks = []
+    cur = []
+    used = 0
+    for e in entries:
+        rec = _dir_rec_len(e[0])
+        if rec > _BS:
+            raise ValueError("目录条目名过长（>1008B）: " + e[0])
+        if cur and used + rec > _BS:
+            blocks.append(cur)
+            cur = []
+            used = 0
+        cur.append(e)
+        used += rec
+    if cur:
+        blocks.append(cur)
+    return blocks
+
+
 def _write_dir_block(block, entries):
     """把目录条目编码进一个 1024B 块。条目：[(name, ino, ft)]。
-    调用方须把 "." 与 ".." 作为普通条目传入（根目录指向自身）。"""
+    调用方须把 "." 与 ".." 作为普通条目传入（根目录指向自身），
+    且 entries 必须**已经**由 `_split_dir_blocks` 切好（保证装得下）。"""
     cur = 0
     entries = list(entries)
     for i, (name, ino, ft) in enumerate(entries):
@@ -209,6 +243,8 @@ def _write_dir_block(block, entries):
         rec = (actual + 3) & ~3
         if i == len(entries) - 1:
             rec = _BS - cur
+        if rec < actual or cur + rec > _BS:
+            raise ValueError("目录条目溢出 1024B 块（应先用 _split_dir_blocks 切分）")
         struct.pack_into("<I", block, cur, ino)
         struct.pack_into("<H", block, cur + 4, rec)
         block[cur + 6] = nlen
@@ -312,7 +348,6 @@ def _write_ext2_filesystem(path, part_start_lba, part_sectors, files, label):
         dir_parent[ino] = parent_ino
         if kind == "dir":
             val = payload[1]
-            dblock = alloc.alloc()
             children = []
             for name, child in val.items():
                 child_ino, child_payload = child
@@ -320,7 +355,15 @@ def _write_ext2_filesystem(path, part_start_lba, part_sectors, files, label):
                 ft = EXT2_FT_DIR if ckind == "dir" else EXT2_FT_REG_FILE
                 children.append((name, child_ino, ft))
             dir_entries[ino] = children
-            inode_meta[ino] = (EXT2_S_IFDIR | 0o755, _BS, [dblock] + [0] * 14, 2)
+            # 目录**可能装不下一个块**（条目多）：按 1024B 切块，逐块分配。
+            full = [(".", ino, EXT2_FT_DIR), ("..", parent_ino, EXT2_FT_DIR)] + children
+            nblk = len(_split_dir_blocks(full))
+            if nblk > 12:
+                raise ValueError("目录 inode=%d 需要 %d 个数据块（>12，需间接块；未实现）"
+                                 % (ino, nblk))
+            dblocks = [alloc.alloc() for _ in range(nblk)]
+            inode_meta[ino] = (EXT2_S_IFDIR | 0o755, nblk * _BS,
+                               dblocks + [0] * (15 - len(dblocks)), nblk * 2)
             for name, child in val.items():
                 walk(child, ino)
         else:
@@ -438,15 +481,15 @@ def _write_ext2_filesystem(path, part_start_lba, part_sectors, files, label):
                 f.seek(itab + (ino - 1) * _INODE_SIZE)
                 f.write(inode)
 
-        # 目录块内容：加 . 与 ..
+        # 目录块内容：加 . 与 ..，按 _split_dir_blocks 的切分**逐块**写入。
         for ino, (mode, size, ib, sectors) in inode_meta.items():
             if mode & EXT2_S_IFDIR:
-                dblock = ib[0]
-                d = alloc.pending.get(dblock, bytearray(_BS))
                 entries = [(".", ino, EXT2_FT_DIR), ("..", dir_parent[ino], EXT2_FT_DIR)]
                 entries.extend(dir_entries[ino])
-                _write_dir_block(d, entries)
-                alloc.pending[dblock] = d
+                for blk, chunk in zip(ib, _split_dir_blocks(entries)):
+                    d = alloc.pending.get(blk, bytearray(_BS))
+                    _write_dir_block(d, chunk)
+                    alloc.pending[blk] = d
         # 文件数据
         for ino, (i_block, data) in file_data.items():
             _write_file_data(alloc, i_block, data)
