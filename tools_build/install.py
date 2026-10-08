@@ -204,8 +204,34 @@ def cmd(args) -> int:
     # **递归**拷贝：POSIX 头有 sys/ 子目录（sys/mman.h、sys/stat.h、sys/types.h）；
     # 此前只 listdir 一层，子目录会被静默漏掉——那种「库在、头不在」的缺口最难查。
     shutil.copytree(inc_src, inc_dir, dirs_exist_ok=True)
+
+    # **同一套 C 头再铺一份到 <prefix>/usr/include**。
+    #
+    # 为什么必须有两处：GCC 的 `NATIVE_SYSTEM_HEADER_DIR` 默认是 `/usr/include`，
+    # 而它被拼成 `CROSS_SYSTEM_HEADER_DIR = $(TARGET_SYSTEM_ROOT)/usr/include`——
+    # 于是装好的 `x86_64-boruix-g++` 在只有 `<sysroot>/include` 的 sysroot 里
+    # **找不到 `stdio.h`**（实测：`cstdio:42: fatal error: stdio.h: No such file or directory`）。
+    #
+    # 另一条路是 configure 加 `--with-native-system-header-dir=/include`，但：
+    #   ① 它必须是**绝对路径**（传相对路径时顶层 configure 接受、子 configure 硬报错，
+    #      实测 `argument include must be an absolute directory`）；
+    #   ② 在 MSYS2 下 `/include` 会被**参数改写**成 `include`（同样报上面那个错），
+    #      得再套 `MSYS2_ARG_CONV_EXCL` 才能过。
+    # 而本处这条路是 **sysroot 侧的自洽选择**：对**任何**编译器都成立——包括将来系统内的
+    # 原生 GCC（那时不会有 configure 旗标可加）。两份由**同一次 install、同一个源目录**写出，
+    # 不存在漂移（不是"两份实现"，是同一份的两处落点）。
+    shutil.copytree(inc_src, os.path.join(prefix, "usr", "include"), dirs_exist_ok=True)
     shutil.copy(os.path.join(config.PROJECT_ROOT, "csrc", "linker.ld"),
                 os.path.join(lib_dir, "linker.ld"))
+
+    # libm.a：**本系统没有单独的 libm**——数学函数就在 libc.a 里（libc/src/math_core*.rs
+    # 经 math_exports.rs 导出）。但 g++ 的链接规格会给 C++ 程序加 `-lm`，缺它就直接失败：
+    #     ld.lld: error: unable to find library -lm
+    # 故放一个**空归档**（8 字节 `!<arch>\n`）：所有数学符号都由随后必然出现的 `-lc` 满足
+    # （见 gcc/config/boruix.h 的 LIB_SPEC）。这不是伪造一个库——它就是「libm 是 libc 的一部分」
+    # 这一事实的空壳（musl 等系统同样把 libm 并入 libc）。
+    with open(os.path.join(lib_dir, "libm.a"), "wb") as f:
+        f.write(b"!<arch>\n")
 
     # 目标规格以**规范三元组名**落在 sysroot 根：这样 RUST_TARGET_PATH=<prefix> 即可按名使用
     # （3P2-4 端点 B 的本地 Tier-3 形态），不再依赖 --target <path.json>。
