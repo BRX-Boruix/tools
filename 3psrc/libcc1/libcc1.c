@@ -27,6 +27,15 @@
 #include <spawn.h>
 #include <sys/wait.h>
 
+/* ---- C++ 静态构造（.init_array）探针：这是 libstdc++ 的**前置地基** ----
+ * 现在 Boruix 的入口链路（libsys 的 _start -> user_main -> main）**不遍历 .init_array**，
+ * 且 csrc/linker.ld 也不收集它 ⇒ 构造函数**永远不会跑**。
+ * 本探针就是那条「必须先红」的验收：红 = 构造没跑。 */
+static int g_ctor_ran = 0;
+__attribute__((constructor)) static void boruix_ctor_probe(void) {
+    g_ctor_ran = 1;
+}
+
 static int fails = 0;
 static int seq = 0;
 static int onexit_ok = 0;
@@ -258,6 +267,8 @@ int main(void) {
             unlink("/scratch/c1probe.txt");
         }
     }
+
+    chk(g_ctor_ran == 1, "C++ 静态构造（.init_array）在 main 之前已执行");
 
     /* ---- C2 批：seekdir / telldir / scandir / alphasort ---- */
     {
