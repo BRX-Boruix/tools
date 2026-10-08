@@ -1,14 +1,12 @@
-//! 数学核心的**宿主对照验证器**（B 档：目标 ≤1 ulp）。
-//!
-//! 做法：`include!` 纯计算核心，与**宿主 glibc 的 libm**（`f64::sin` 等最终调 libm）
-//! 在**大样本 + 边界值**上逐点比对，输出**实测最大 ULP 误差**。
-//!
-//! 编译运行（宿主，秒级）：
-//!     rustc -O --edition 2021 verify.rs -o verify.exe && ./verify.exe
+// 数学核心的**宿主对照验证器**（B 档：目标 ≤1 ulp）。
+// 用 mod + include! 把 libc 里的**同一份源码**引入，与宿主 glibc 的 libm 逐点比 ULP。
+// 运行：rustc -O --edition 2021 verify.rs -o verify.exe && ./verify.exe
 
-include!("../../../libc/src/math_core.rs");
+mod math_core { include!("../../../libc/src/math_core.rs"); }
+mod math_core2 { include!("../../../libc/src/math_core2.rs"); }
+use math_core::*;
+use math_core2::*;
 
-/// 两个 f64 之间的 ULP 距离（同号有限值；跨 0/inf/nan 返回 i64::MAX 表示不可比）。
 fn ulp_diff(a: f64, b: f64) -> i64 {
     if a.is_nan() && b.is_nan() { return 0; }
     if a == b { return 0; }
@@ -20,48 +18,67 @@ fn ulp_diff(a: f64, b: f64) -> i64 {
     (fa - fb).abs()
 }
 
-struct Stat { name: &'static str, n: u64, max_ulp: i64, worst: f64 }
-
-fn check(name: &'static str, ours: fn(f64) -> f64, theirs: fn(f64) -> f64, xs: &[f64]) -> Stat {
-    let mut s = Stat { name, n: 0, max_ulp: 0, worst: f64::NAN };
+fn run(name: &str, ours: fn(f64) -> f64, theirs: fn(f64) -> f64, xs: &[f64], bad: &mut Vec<String>) {
+    let mut max = 0i64; let mut worst = f64::NAN;
     for &x in xs {
-        let a = ours(x);
-        let b = theirs(x);
-        let d = ulp_diff(a, b);
-        s.n += 1;
-        if d > s.max_ulp { s.max_ulp = d; s.worst = x; }
+        let d = ulp_diff(ours(x), theirs(x));
+        if d > max { max = d; worst = x; }
     }
-    s
+    let flag = if max > 1 { bad.push(name.to_string()); "  <== 超 B 档" } else { "" };
+    println!("{:<9} {:>7} {:>9}  {:e}{}", name, xs.len(), max, worst, flag);
+}
+
+fn run2(name: &str, ours: fn(f64, f64) -> f64, theirs: fn(f64, f64) -> f64, xs: &[f64], ys: &[f64], bad: &mut Vec<String>) {
+    let mut max = 0i64; let mut worst = (f64::NAN, f64::NAN); let mut n = 0u64;
+    for &x in xs { for &y in ys {
+        let d = ulp_diff(ours(x, y), theirs(x, y));
+        n += 1;
+        if d > max { max = d; worst = (x, y); }
+    } }
+    let flag = if max > 1 { bad.push(name.to_string()); "  <== 超 B 档" } else { "" };
+    println!("{:<9} {:>7} {:>9}  ({:e},{:e}){}", name, n, max, worst.0, worst.1, flag);
 }
 
 fn main() {
-    // 样本：广泛覆盖 + 边界
     let mut xs: Vec<f64> = Vec::new();
     let mut i = -2000i64;
     while i <= 2000 { xs.push(i as f64 / 16.0); i += 1; }
     let mut j = 1i64;
-    while j <= 400 { xs.push(j as f64 / 7.0); xs.push(-(j as f64) / 7.0); j += 1; }
-    xs.extend_from_slice(&[0.0, -0.0, 1.0, -1.0, 0.5, -0.5, 2.0, 0.25, 1e-300, 1e300, 1e-15, 1e15,
-        3.14159265358979, 1e10, 0.9999999999, 1.0000000001, 123.456, -123.456, 1e-8, 1e8]);
-    let mut stats = vec![
-        check("fabs",   core_fabs,   |x| x.abs(),   &xs),
-        check("floor",  core_floor,  |x| x.floor(), &xs),
-        check("ceil",   core_ceil,   |x| x.ceil(),  &xs),
-        check("trunc",  core_trunc,  |x| x.trunc(), &xs),
-        check("round",  core_round,  |x| x.round(), &xs),
-        check("sqrt",   core_sqrt,   |x: f64| x.sqrt(), &xs),
-    ];
-    let mut fmod_n = 0u64; let mut fmod_max = 0i64; let mut fmod_worst = f64::NAN;
-    for &x in &xs { for &y in &[3.0f64, 7.0, 0.1, 2.5, 1e-3] {
-        let a = core_fmod(x, y); let b = x % y; let d = ulp_diff(a, b);
-        fmod_n += 1; if d > fmod_max { fmod_max = d; fmod_worst = x; } } }
-    stats.push(Stat { name: "fmod", n: fmod_n, max_ulp: fmod_max, worst: fmod_worst });
-    println!("{:<8} {:>8} {:>10}  {}", "函数", "样本数", "最大ULP", "最差点");
-    let mut bad = 0;
-    for s in &stats {
-        let flag = if s.max_ulp > 1 { "  <== 超 B 档" } else { "" };
-        if s.max_ulp > 1 { bad += 1; }
-        println!("{:<8} {:>8} {:>10}  {:e}{}", s.name, s.n, s.max_ulp, s.worst, flag);
-    }
-    println!("\n超 B 档（>1 ulp）的函数数 = {}", bad);
+    while j <= 600 { xs.push(j as f64 / 7.0); xs.push(-(j as f64) / 7.0); j += 1; }
+    xs.extend_from_slice(&[0.0, -0.0, 1.0, -1.0, 0.5, -0.5, 2.0, 0.25, 1e-300, 1e300, 1e-15,
+        1e15, 3.14159265358979, 1e10, 0.9999999999, 1.0000000001, 123.456, -123.456,
+        1e-8, 1e8, 0.1, 0.9, -0.9, 1.5, -1.5, 3.0, 10.0, 100.0, 700.0, -700.0]);
+    // exp/log 用正样本为主
+    let pos: Vec<f64> = xs.iter().cloned().filter(|&x| x > 0.0).collect();
+    let mut bad: Vec<String> = Vec::new();
+    println!("{:<9} {:>7} {:>9}  {}", "函数", "样本数", "最大ULP", "最差点");
+    run("fabs",   core_fabs,   |x| x.abs(),   &xs, &mut bad);
+    run("floor",  core_floor,  |x| x.floor(), &xs, &mut bad);
+    run("ceil",   core_ceil,   |x| x.ceil(),  &xs, &mut bad);
+    run("trunc",  core_trunc,  |x| x.trunc(), &xs, &mut bad);
+    run("round",  core_round,  |x| x.round(), &xs, &mut bad);
+    run("sqrt",   core_sqrt,   |x: f64| x.sqrt(), &xs, &mut bad);
+    run("cbrt",   core_cbrt,   |x: f64| x.cbrt(), &xs, &mut bad);
+    run("exp",    core_exp,    |x: f64| x.exp(), &xs, &mut bad);
+    run("expm1",  core_expm1,  |x: f64| x.exp_m1(), &xs, &mut bad);
+    run("log",    core_log,    |x: f64| x.ln(), &pos, &mut bad);
+    run("log1p",  core_log1p,  |x: f64| x.ln_1p(), &xs, &mut bad);
+    run("log2",   core_log2,   |x: f64| x.log2(), &pos, &mut bad);
+    run("log10",  core_log10,  |x: f64| x.log10(), &pos, &mut bad);
+    run("sin",    core_sin,    |x: f64| x.sin(), &xs, &mut bad);
+    run("cos",    core_cos,    |x: f64| x.cos(), &xs, &mut bad);
+    run("tan",    core_tan,    |x: f64| x.tan(), &xs, &mut bad);
+    run("atan",   core_atan,   |x: f64| x.atan(), &xs, &mut bad);
+    run("asin",   core_asin,   |x: f64| x.asin(), &xs, &mut bad);
+    run("acos",   core_acos,   |x: f64| x.acos(), &xs, &mut bad);
+    run("sinh",   core_sinh,   |x: f64| x.sinh(), &xs, &mut bad);
+    run("cosh",   core_cosh,   |x: f64| x.cosh(), &xs, &mut bad);
+    run("tanh",   core_tanh,   |x: f64| x.tanh(), &xs, &mut bad);
+    run2("atan2", core_atan2,  |y: f64, x: f64| y.atan2(x), &xs, &[1.0, -1.0, 0.5, 2.0, 0.0, -0.0], &mut bad);
+    run2("hypot", core_hypot,  |x: f64, y: f64| x.hypot(y), &xs, &[1.0, 2.0, 0.5], &mut bad);
+    run2("fmod",  core_fmod,   |x: f64, y: f64| x % y, &xs, &[3.0, 7.0, 0.1, 2.5], &mut bad);
+    run2("pow",   core_pow,    |x: f64, y: f64| x.powf(y), &pos, &[2.0, 3.0, 0.5, 1.5, -1.0], &mut bad);
+    println!();
+    println!("超 B 档（>1 ulp）的函数：{:?}", bad);
+    println!("达标函数数 = {} / 27", 27 - bad.len());
 }
