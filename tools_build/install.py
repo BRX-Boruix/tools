@@ -85,7 +85,9 @@ def main(argv):
             return r.returncode
         objs.append(o)
     link = [lld, "-o", out, "-e", "_start", "-nostdlib", "--no-dynamic-linker",
-            os.path.join(LIB, "user_main.o")] + objs + [
+            # **入口桥接用 argv 版**：本系统 argv[0] 是整条命令行，裸版会让 C 程序
+            # 看不到任何参数（与 gcc/config/boruix.h 的 STARTFILE_SPEC 同一条理由）。
+            os.path.join(LIB, "user_main_argv.o")] + objs + [
             os.path.join(LIB, "libc.a"), "-z", "noexecstack",
             # **必须 norelro**：ld.lld 默认 -z relro，会为数据段生成 GNU_RELRO，把第一个
             # RW 段拆成两个**共享同一页**的 PT_LOAD（实测：0x445d68 落在 0x445000 页，
