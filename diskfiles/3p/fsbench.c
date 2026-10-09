@@ -83,6 +83,34 @@ int main(void)
         }
     }
 
+    /* 判别实验 A：纯内存 memcpy 对照（不碰 stdio、不碰内核）。 */
+    {
+        static char dst[SZ];
+        t0 = tsc();
+        for (i = 0; i < N; i++) { int k; for (k = 0; k < SZ; k++) dst[k] = buf[k]; }
+        t1 = tsc();
+        printf("memcpy %4d x %d bytes : %12llu cycles (%llu/op)\n", N, SZ, t1 - t0, (t1 - t0) / N);
+    }
+
+    /* 判别实验 B：同样 2000 次 fwrite，但块大小 1024（总字节 2 MB，是 A 的 16 倍）。
+       若每次调用的**固定开销**是主因 ⇒ 这一行与 64 字节那行每次耗时相近；
+       若按**字节**收费 ⇒ 这一行会贵约 16 倍。 */
+    {
+        static char big[1024];
+        FILE *sf = fopen(path, "wb");
+        if (sf) {
+            unsigned long w0 = boruix_stdio_write_calls();
+            t0 = tsc();
+            for (i = 0; i < N; i++) fwrite(big, 1, 1024, sf);
+            fflush(sf);
+            t1 = tsc();
+            printf("fwrite %4d x 1024 bytes: %12llu cycles (%llu/op)\n", N, t1 - t0, (t1 - t0) / N);
+            printf("      底层 write 次数 = %lu (共 %d 字节)\n",
+                   boruix_stdio_write_calls() - w0, N * 1024);
+            fclose(sf);
+        }
+    }
+
     printf("fsbench: done\n");
     return 0;
 }
