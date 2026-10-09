@@ -10,6 +10,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <boruix.h>
 
 static unsigned long long tsc(void)
 {
@@ -64,11 +65,18 @@ int main(void)
     {
         FILE *sf = fopen(path, "wb");
         if (sf) {
+            unsigned long w0 = boruix_stdio_write_calls();
+            unsigned long b0 = boruix_stdio_write_bytes();
             t0 = tsc();
             for (i = 0; i < N; i++) fwrite(buf, 1, SZ, sf);
             fflush(sf);
             t1 = tsc();
             printf("fwrite %4d x %d bytes : %12llu cycles (%llu/op)\n", N, SZ, t1 - t0, (t1 - t0) / N);
+            /* **可观察真值**：缓冲若生效，2000 次 fwrite 应只产生约 N*SZ/4096 = 32 次底层写。 */
+            printf("      底层 write 次数 = %lu, 字节 = %lu (期望约 %d 次 / %d 字节)\n",
+                   boruix_stdio_write_calls() - w0,
+                   boruix_stdio_write_bytes() - b0,
+                   (N * SZ) / 4096 + 1, N * SZ);
             fclose(sf);
         } else {
             printf("fsbench: fopen failed\n");
