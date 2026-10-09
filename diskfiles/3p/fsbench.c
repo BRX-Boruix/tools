@@ -58,6 +58,23 @@ int main(void)
     printf("write  1 x %d bytes    : %12llu cycles\n", SZ, t1 - t0);
     close(fd);
 
+    /* 关键对照：同样的 2000 次 64 字节写，但**经 stdio 缓冲层**（fopen/fwrite）。
+       若缓冲生效，这一行应比上面的裸 write 快几个数量级；若几乎一样，
+       说明缓冲没生效（每次 fwrite 仍是一次系统调用）。 */
+    {
+        FILE *sf = fopen(path, "wb");
+        if (sf) {
+            t0 = tsc();
+            for (i = 0; i < N; i++) fwrite(buf, 1, SZ, sf);
+            fflush(sf);
+            t1 = tsc();
+            printf("fwrite %4d x %d bytes : %12llu cycles (%llu/op)\n", N, SZ, t1 - t0, (t1 - t0) / N);
+            fclose(sf);
+        } else {
+            printf("fsbench: fopen failed\n");
+        }
+    }
+
     printf("fsbench: done\n");
     return 0;
 }
