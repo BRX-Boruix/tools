@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
 
 #define N 4096
 static unsigned char *p[N];
@@ -52,6 +53,37 @@ int main(void) {
         }
     }
     for (int i = 0; i < N; i++) if (p[i]) free(p[i]);
+
+    /* ---- mmap 探针：POSIX 要求匿名映射返回**零填充**页，而 GCC 的 ggc 完全依赖这一点
+     *      （ggc-page 用 mmap 拿页组，然后假设内容为 0）。若内核没清零，cc1 会读到垃圾指针
+     *      ⇒ 正是"GIMPLE CFG pass 段错误"的形状。这里直接验。 ---- */
+    {
+        const unsigned long LEN = 1UL << 20;
+        void *m = mmap(NULL, LEN, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+        if (m == MAP_FAILED) {
+            printf("FAIL mmap 失败\n"); fails++;
+        } else {
+            unsigned char *b = (unsigned char *)m;
+            unsigned long j;
+            for (j = 0; j < LEN; j++) {
+                if (b[j] != 0) { printf("FAIL mmap 页非零 j=%lu v=%u\n", j, (unsigned)b[j]); fails++; break; }
+            }
+            if (j == LEN) printf("ok   mmap 1MiB 全零\n");
+            munmap(m, LEN);
+        }
+        /* 反复映射/解除映射：ggc 会做很多次，检查地址不重叠、内容独立。 */
+        void *a = mmap(NULL, 65536, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+        void *b2 = mmap(NULL, 65536, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+        if (a == MAP_FAILED || b2 == MAP_FAILED) { printf("FAIL 连续 mmap 失败\n"); fails++; }
+        else {
+            memset(a, 0xAA, 65536); memset(b2, 0x55, 65536);
+            if (((unsigned char *)a)[0] != 0xAA || ((unsigned char *)b2)[0] != 0x55) {
+                printf("FAIL 两次 mmap 相互串扰\n"); fails++;
+            } else printf("ok   两次 mmap 互不串扰\n");
+            munmap(a, 65536); munmap(b2, 65536);
+        }
+    }
+
     printf("heapstress: fails=%d\n", fails);
     return fails ? 1 : 0;
 }
