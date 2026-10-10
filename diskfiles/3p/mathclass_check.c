@@ -59,6 +59,21 @@ int main(void) {
     chk("宏 HUGE_VAL 是无穷", isinf(HUGE_VAL) == 1);
     chk("宏 NAN/INFINITY 分类正确", fpclassify(NAN) == FP_NAN && fpclassify(INFINITY) == FP_INFINITE);
 
+    /* strtod 必须认 "nan"/"inf"/"infinity"（C99）——此前**完全不认**（静默返回 0）。 */
+    chk("strtod(nan) 是 NaN", isnan(strtod("nan", 0)) != 0);
+    chk("strtod(NAN) 大小写不敏感", isnan(strtod("NAN", 0)) != 0);
+    chk("strtod(inf) 是 +inf", isinf(strtod("inf", 0)) == 1);
+    chk("strtod(-infinity) 是 -inf", isinf(strtod("-infinity", 0)) == -1);
+    chk("strtod(INF) 大小写不敏感", isinf(strtod("INF", 0)) == 1);
+    chk("strtod(nan(123)) 吃掉括号序列", isnan(strtod("nan(123)", 0)) != 0);
+    chk("strtod(1.5) 仍是 1.5", strtod("1.5", 0) == 1.5);
+    chk("strtod(abc) 仍返回 0", strtod("abc", 0) == 0.0);
+    {
+        char *ep = 0;
+        double v = strtod("infinityXYZ", &ep);
+        chk("endptr 停在 infinity 之后", isinf(v) == 1 && ep != 0 && *ep == 'X');
+    }
+
     printf("mathclass_check: fails=%d\n", fails);
     return fails ? 1 : 0;
 }
