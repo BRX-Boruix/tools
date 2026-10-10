@@ -72,6 +72,18 @@ def main():
             elif sha256(s) != sha256(d):
                 drift.append("头文件不一致: " + rel)
 
+    # 3) tcc.elf（**编译器本体**）：与 libc.a 同族的「手工拷贝」资产，此前**没有任何
+    #    门禁**。2026-10 实测事故：改了 tccelf.c 却没把新 tcc.elf 铺到盘上，一次 A/B
+    #    的两臂跑的是同一份旧二进制（仪器标记在两臂里都没出现才发现）。
+    src_tcc = os.path.join(ROOT, "tcc-on-boruix", "_build", "tcc.elf")
+    dst_tcc = os.path.join(ROOT, "tools", "diskfiles", "3p", "tcc.elf")
+    if not os.path.isfile(src_tcc):
+        drift.append("tcc.elf：构建产物缺失（" + src_tcc + "）——先跑 boruix/build.py")
+    elif not os.path.isfile(dst_tcc):
+        drift.append("tcc.elf：铺料缺失（" + dst_tcc + "）")
+    elif sha256(src_tcc) != sha256(dst_tcc):
+        drift.append("tcc.elf：与 _build 产物不一致（机内跑的是**旧编译器**）")
+
     if drift:
         print("[FAIL] 机内 tcc 资产与 sysroot 不同步（%d 项）——请先重铺:" % len(drift))
         print("       python tcc-on-boruix/boruix/stage_assets.py --sysroot <sysroot>")
@@ -81,7 +93,7 @@ def main():
             print("       ...（其余 %d 项省略）" % (len(drift) - 20))
         return 1
 
-    print("[OK] 机内 tcc 资产与 sysroot 一致（libc.a + 全部头文件）")
+    print("[OK] 机内 tcc 资产与 sysroot 一致（libc.a + 全部头文件 + tcc.elf）")
     return 0
 
 
