@@ -10,6 +10,11 @@
 
 本脚本把「记得重铺」变成一次**可执行的检查**：不一致就**响亮报错**（非 0 退出）。
 
+**覆盖范围（名字是历史遗留，实际是「数据盘上那几个手工拷贝的资产」）**：
+  libc.a + 全部头文件 + tcc.elf（机内编译器）+ rtld.elf（动态链接器）。
+rtld.elf 的构建+铺料在 `tools/tools_build/build_rtld.py`；tcc.elf 在
+`tcc-on-boruix/boruix/build.py` + `stage_assets.py`。
+
 用法:
     set BORUIX_SYSROOT=<install --prefix 的产物>
     python tools/checks/dist/tcc_assets_fresh.py            # 或 --sysroot <dir>
@@ -84,16 +89,29 @@ def main():
     elif sha256(src_tcc) != sha256(dst_tcc):
         drift.append("tcc.elf：与 _build 产物不一致（机内跑的是**旧编译器**）")
 
+    # 4) rtld.elf（**动态链接器**）：与 tcc.elf 同族的「手工拷贝」资产。2026-10 已补上
+    #    构建+铺料脚本 tools/tools_build/build_rtld.py；这里把「记得重铺」变成门禁。
+    #    教训同 3)：改了 rtld 源码却没重铺 ⇒ 机上跑的仍是旧 rtld，测量作废。
+    src_rtld = os.path.join(ROOT, "rtld", "target", "x86_64-unknown-boruix", "debug", "rtld")
+    dst_rtld = os.path.join(ROOT, "tools", "diskfiles", "3p", "rtld.elf")
+    if not os.path.isfile(src_rtld):
+        drift.append("rtld.elf：构建产物缺失（" + src_rtld + "）——先跑 tools/tools_build/build_rtld.py")
+    elif not os.path.isfile(dst_rtld):
+        drift.append("rtld.elf：铺料缺失（" + dst_rtld + "）")
+    elif sha256(src_rtld) != sha256(dst_rtld):
+        drift.append("rtld.elf：与构建产物不一致（机内跑的是**旧 rtld**）")
+
     if drift:
-        print("[FAIL] 机内 tcc 资产与 sysroot 不同步（%d 项）——请先重铺:" % len(drift))
+        print("[FAIL] 数据盘资产与构建产物不同步（%d 项）——请先重铺:" % len(drift))
         print("       python tcc-on-boruix/boruix/stage_assets.py --sysroot <sysroot>")
+        print("       python tools/tools_build/build_rtld.py --sysroot <sysroot>")
         for d in drift[:20]:
             print("       - " + d)
         if len(drift) > 20:
             print("       ...（其余 %d 项省略）" % (len(drift) - 20))
         return 1
 
-    print("[OK] 机内 tcc 资产与 sysroot 一致（libc.a + 全部头文件 + tcc.elf）")
+    print("[OK] 数据盘资产与构建产物一致（libc.a + 全部头文件 + tcc.elf + rtld.elf）")
     return 0
 
 
