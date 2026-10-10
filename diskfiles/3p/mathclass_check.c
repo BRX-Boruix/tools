@@ -52,6 +52,13 @@ int main(void) {
     (void)0;
     chk("float 实参可用（隐式转换）", fpclassify(fzero) == FP_ZERO);
 
+    /* NAN/INFINITY/HUGE_VAL 宏本身（此前是 __builtin_nanf/__builtin_inff，tcc 下链接失败）。 */
+    chk("宏 NAN 真的是 NaN", isnan(NAN) != 0);
+    chk("宏 INFINITY 真的是无穷", isinf(INFINITY) == 1);
+    chk("宏 -INFINITY 是负无穷", isinf(-INFINITY) == -1);
+    chk("宏 HUGE_VAL 是无穷", isinf(HUGE_VAL) == 1);
+    chk("宏 NAN/INFINITY 分类正确", fpclassify(NAN) == FP_NAN && fpclassify(INFINITY) == FP_INFINITE);
+
     printf("mathclass_check: fails=%d\n", fails);
     return fails ? 1 : 0;
 }
