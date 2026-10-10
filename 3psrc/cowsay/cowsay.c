@@ -17,12 +17,15 @@
  * 气泡里出现替换字符与错位。故本版：
  *   - 折行按**显示列数**（东亚宽/全角算 2 列），且**绝不断开**一个 UTF-8 序列；
  *   - 补齐右边界时也按显示列数。
- * **诚实边界（S09）**：这不是完整 wcwidth（没有 Unicode 宽度表），只覆盖常见区间；
- * 组合符号按 0 列处理；未覆盖区间的字符按 1 列算。
+ * 显示列数**统一走 libc 的 `wcwidth`**（S15 单点）。此前这里有一份私有近似表，
+ * 注释如实写着「不是完整 wcwidth」——私有表的后果是每个要列宽的程序都得再抄一份。
+ * 现在 libc 提供了真正的 `wcwidth`（`libc/src/wcwidth.rs`，区间表 + 边界成文），
+ * 本程序只保留「不可打印按 1 列」这一层折行兜底。
  */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <wchar.h>
 
 #define DEF_WIDTH 40
 #define MAX_LINES 256
@@ -63,24 +66,13 @@ static unsigned u8_decode(const unsigned char *p, int n) {
            ((unsigned)(p[2] & 0x3F) << 6) | (unsigned)(p[3] & 0x3F);
 }
 
-/* 显示列数：东亚宽/全角 = 2，组合符号 = 0，其余 = 1。 */
+/* 显示列数：**统一走 libc 的 `wcwidth`**（S15 单点）。
+ *
+ * 不可打印字符（`wcwidth` 返回 -1）在折行里按 1 列兜底——折行必须给出一个有限宽度，
+ * 而控制字符本就不该出现在消息文本里（真出现了也不该把折行算成负数或 0 列）。 */
 static int disp_width(unsigned cp) {
-    if (cp == 0 || cp < 32 || cp == 0x7f) return 0;
-    if (cp >= 0x0300 && cp <= 0x036F) return 0;              /* 组合变音符 */
-    if ((cp >= 0x1100 && cp <= 0x115F) ||                    /* 谚文字母 */
-        (cp >= 0x2E80 && cp <= 0x303E) ||                    /* CJK 部首 */
-        (cp >= 0x3041 && cp <= 0x33FF) ||                    /* 假名/注音/兼容 */
-        (cp >= 0x3400 && cp <= 0x4DBF) ||                    /* CJK 扩展 A */
-        (cp >= 0x4E00 && cp <= 0x9FFF) ||                    /* CJK 统一表意 */
-        (cp >= 0xA000 && cp <= 0xA4CF) ||                    /* 彝文 */
-        (cp >= 0xAC00 && cp <= 0xD7A3) ||                    /* 谚文音节 */
-        (cp >= 0xF900 && cp <= 0xFAFF) ||                    /* CJK 兼容表意 */
-        (cp >= 0xFE30 && cp <= 0xFE6F) ||                    /* CJK 兼容形式 */
-        (cp >= 0xFF00 && cp <= 0xFF60) ||                    /* 全角形式 */
-        (cp >= 0xFFE0 && cp <= 0xFFE6) ||
-        (cp >= 0x20000 && cp <= 0x3FFFD))                    /* CJK 扩展 B+ */
-        return 2;
-    return 1;
+    int w = wcwidth((wchar_t)cp);
+    return w < 0 ? 1 : w;
 }
 
 /* 从 s 起、最多 max_bytes 字节内，取不超过 max_cols 显示列的整字符前缀。
