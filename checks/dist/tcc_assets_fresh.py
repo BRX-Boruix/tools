@@ -11,8 +11,8 @@
 本脚本把「记得重铺」变成一次**可执行的检查**：不一致就**响亮报错**（非 0 退出）。
 
 **覆盖范围（名字是历史遗留，实际是「数据盘上那几个手工拷贝的资产」）**：
-  libc.a + 全部头文件 + tcc.elf（机内编译器）+ rtld.elf（动态链接器）。
-rtld.elf 的构建+铺料在 `tools/tools_build/build_rtld.py`；tcc.elf 在
+  libc.a + 全部头文件 + tcc.elf（机内编译器）+ rtld.elf（动态链接器）+ tccmt.elf（libtcc 能力探针）。
+rtld.elf 的构建+铺料在 `tools/tools_build/build_rtld.py`；tcc.elf 与 tccmt.elf 在
 `tcc-on-boruix/boruix/build.py` + `stage_assets.py`。
 
 用法:
@@ -101,6 +101,17 @@ def main():
     elif sha256(src_rtld) != sha256(dst_rtld):
         drift.append("rtld.elf：与构建产物不一致（机内跑的是**旧 rtld**）")
 
+    # 5) tccmt.elf（**libtcc 能力探针**）：与 tcc.elf 同一形态的手工拷贝资产。
+    #    探针要证明的是「当前这份 libtcc 无互斥」；盘上留旧探针就等于拿旧构建当证据。
+    src_probe = os.path.join(ROOT, "tcc-on-boruix", "_build", "tccmt.elf")
+    dst_probe = os.path.join(ROOT, "tools", "diskfiles", "3p", "tccmt.elf")
+    if not os.path.isfile(src_probe):
+        drift.append("tccmt.elf：构建产物缺失（" + src_probe + "）——先跑 boruix/build.py --probe tccmt")
+    elif not os.path.isfile(dst_probe):
+        drift.append("tccmt.elf：铺料缺失（" + dst_probe + "）")
+    elif sha256(src_probe) != sha256(dst_probe):
+        drift.append("tccmt.elf：与 _build 产物不一致（机内跑的是**旧探针**）")
+
     if drift:
         print("[FAIL] 数据盘资产与构建产物不同步（%d 项）——请先重铺:" % len(drift))
         print("       python tcc-on-boruix/boruix/stage_assets.py --sysroot <sysroot>")
@@ -111,7 +122,7 @@ def main():
             print("       ...（其余 %d 项省略）" % (len(drift) - 20))
         return 1
 
-    print("[OK] 数据盘资产与构建产物一致（libc.a + 全部头文件 + tcc.elf + rtld.elf）")
+    print("[OK] 数据盘资产与构建产物一致（libc.a + 全部头文件 + tcc.elf + rtld.elf + tccmt.elf）")
     return 0
 
 
