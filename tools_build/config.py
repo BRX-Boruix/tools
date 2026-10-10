@@ -93,6 +93,13 @@ def sound_card_args(silent=False, path=None):
     单点定义（S15）：起机器的所有路径都从这里取，避免各子命令各写一份、
     改一处漏一处（本项目已在用户程序清单上吃过三份副本的亏）。
     """
+    # **A/B 逃生门（S16）**：`BORUIX_NO_SOUND=1` 时**完全不挂声卡**（控制器与 codec 都不加）。
+    #
+    # 为什么需要它：把「空闲基线烧 3.2 核」归因到 HDA 驱动/设备，需要一条**同一次构建、
+    # 只是没有声卡**的对照臂；否则无法把声卡与内核调度、audiod、QEMU 后端等因素分开。
+    # 这是**判别实验**用的开关，不是运行配置——默认不设，行为与既有完全一致。
+    if os.environ.get("BORUIX_NO_SOUND"):
+        return []
     if silent:
         audiodev = "wav,id=%s,path=%s" % (AUDIODEV_ID, path or OUTPUT_WAV)
     else:
