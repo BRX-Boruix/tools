@@ -32,6 +32,8 @@ OFFLINE_CHECKS = (
     "checks/regression/elf_image_selftest.py",
     "checks/regression/symbols_selftest.py",
     "checks/regression/run_smp_selftest.py",
+    "checks/regression/tool_resolution_selftest.py",
+    "checks/regression/abi_exports_selftest.py",
 )
 
 # 单个检查的超时。超时**算失败**（不能当成 0）。
