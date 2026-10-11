@@ -29,5 +29,5 @@ while ((Get-Date) -lt $dl) {
 }
 Stop-Process -Force -Id $proc.Id -ErrorAction SilentlyContinue
 Get-Process qemu-system-x86_64 -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-Get-Content $log -Encoding UTF8 | Select-String -Pattern "readbench pass|registered via AHCI|already claimed|run exited|CPU EXCEPTION|rip:|cr2:|error:|rsp:|rbp:|\[rsp|got:" | ForEach-Object { $_.Line }
+Get-Content $log -Encoding UTF8 | Select-String -Pattern "readbench pass|registered via AHCI|already claimed|run exited|CPU EXCEPTION|rip:|cr2:|error:|rsp:|rbp:|\[rsp|got:|wrote past" | ForEach-Object { $_.Line }
 "BC $label DONE"
