@@ -22,7 +22,9 @@ cargo 对本自定义目标**丢弃** `cdylib`（实测警告 `dropping unsuppor
 
 前置：`libc/abi-exports.txt` 已由 `libc/tools/gen_abi_exports.py` 生成（本脚本会顺带刷新它）。
 """
+import argparse
 import os
+import shutil
 import subprocess
 import sys
 
@@ -80,8 +82,17 @@ def defined_symbols(archive, nm):
     return out
 
 
+DEFAULT_DEST = os.path.join(ROOT, "tools", "diskfiles", "3p")
+
+
 def main():
-    profile = "debug" if "--debug" in sys.argv else "release"
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--debug", action="store_true")
+    ap.add_argument("--dest", default=DEFAULT_DEST)
+    ap.add_argument("--no-stage", action="store_true",
+                    help="只构建，不铺到数据盘")
+    args = ap.parse_args()
+    profile = "debug" if args.debug else "release"
     # 1) 刷新 ABI 导出清单（脚本自己写文件——不要用 shell 重定向，见该脚本说明）。
     run([sys.executable, os.path.join(LIBC, "tools", "gen_abi_exports.py")])
     # 2) cargo 产出 staticlib（含全部依赖对象：libsys/core/alloc/spin）。
@@ -150,6 +161,17 @@ def main():
         + keep +
         ["-o", out])
     print("[build_so] 产出", out, "(%d KB)" % (os.path.getsize(out) // 1024))
+
+    # 铺到数据盘（同 build_rtld.py 的范式）：`.so` 一直是**手工拷**到 tools/diskfiles/3p/ 的
+    # 资产，没有任何脚本会更新它。2026-10 实测过同族事故：盘上是旧的、机内跑的也是旧的，
+    # 而报告里看不出来。故：产物校验通过后**主动铺**，并把「记得重铺」交给门禁。
+    if args.no_stage:
+        return 0
+    os.makedirs(args.dest, exist_ok=True)
+    dst = os.path.join(args.dest, SONAME)
+    shutil.copy(out, dst)
+    print("[build_so] 已铺到数据盘：" + dst)
+    return 0
 
 
 if __name__ == "__main__":

@@ -28,6 +28,8 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(HERE)))
 STAGED = os.path.join(ROOT, "tools", "diskfiles", "3p", "tcc")
+# 目标三元组（第 6 项比对 libboruixc.so.1 的构建产物路径时要用）。
+TARGET = "x86_64-unknown-boruix"
 
 
 def sha256(path):
@@ -112,6 +114,19 @@ def main():
     elif sha256(src_probe) != sha256(dst_probe):
         drift.append("tccmt.elf：与 _build 产物不一致（机内跑的是**旧探针**）")
 
+    # 6) libboruixc.so.1（**共享 libc**）：与 tcc.elf/rtld.elf 同族的资产，此前**没有门禁、
+    #    也没有铺料脚本**——盘上那份是手工拷的。2026-10 实测到它已经过期：盘上 157 KB，而
+    #    build_so.py 新产的是 259 KB；机内 rtld 装载的正是盘上那份 ⇒ 拿旧库当证据。
+    #    现已在 build_so.py 里补上铺料（同 build_rtld.py 范式），这里把「记得重铺」变成门禁。
+    src_so = os.path.join(ROOT, "libc", "target", TARGET, "release", "libboruixc.so.1")
+    dst_so = os.path.join(ROOT, "tools", "diskfiles", "3p", "libboruixc.so.1")
+    if not os.path.isfile(src_so):
+        drift.append("libboruixc.so.1：构建产物缺失（" + src_so + "）——先跑 tools/tools_build/build_so.py")
+    elif not os.path.isfile(dst_so):
+        drift.append("libboruixc.so.1：铺料缺失（" + dst_so + "）")
+    elif sha256(src_so) != sha256(dst_so):
+        drift.append("libboruixc.so.1：与构建产物不一致（机内 rtld 装载的是**旧 .so**）")
+
     if drift:
         print("[FAIL] 数据盘资产与构建产物不同步（%d 项）——请先重铺:" % len(drift))
         print("       python tcc-on-boruix/boruix/stage_assets.py --sysroot <sysroot>")
@@ -122,7 +137,7 @@ def main():
             print("       ...（其余 %d 项省略）" % (len(drift) - 20))
         return 1
 
-    print("[OK] 数据盘资产与构建产物一致（libc.a + 全部头文件 + tcc.elf + rtld.elf + tccmt.elf）")
+    print("[OK] 数据盘资产与构建产物一致（libc.a + 全部头文件 + tcc.elf + rtld.elf + tccmt.elf + libboruixc.so.1）")
     return 0
 
 
