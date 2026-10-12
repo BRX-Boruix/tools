@@ -19,6 +19,9 @@ static void ck(const char* what, int ok) {
 #define F1  "/volumes/BORUIX_DATA/3p/mumask_f1"
 #define F2  "/volumes/BORUIX_DATA/3p/mumask_f2"
 
+int boruix_identity_set(unsigned int uid, unsigned int gid, unsigned int caps);
+int boruix_identity_query(void* out);
+
 static unsigned int mode_of(const char* p) {
     struct stat st;
     if (stat(p, &st) != 0) return 0xFFFFFFFFu;
@@ -61,17 +64,34 @@ int main(void) {
     (void)umask(0);
 
     /* 5. **权限拦截是生效的** —— 本轮更正上一轮的错误结论。
-     *    上一轮我据 mu3 的 access(W_OK) 成功推断「内核 sys_open 不查 Permissions」，
-     *    那是**位序缺陷**造成的假象：0600 被记成 0o333（含 w）⇒ 自然可写。
-     *    修好后 0600&`0200 = 0o444 ⇒ O_WRONLY 必须被拒（EACCES）。 */
+     *    更正的关键：自动化通道（--run=）**故意**跑在 login 降权之前（init/src/main.rs:1170-1172），
+     *    故本进程持 init 的 system() 全能力（含 CAP_OWNER），而 CAP_OWNER **完全绕过**策略求值
+     *    ⇒ 不主动降权就**永远**看不到拦截。下面先以特权建好只读文件，再降权，然后断言被拒。
+     *
+     *    （背景：上一轮我据 mu3 的 access(W_OK) 成功推断「内核不查权限」，那是**位序缺陷**
+     *    造成的假象——0600 被记成 0o333 含 w；修好后 0o444，O_WRONLY 必须被拒。） */
     (void)unlink(F2);
     (void)umask(0200);                       /* owner 写被掩 ⇒ 建出只读 */
     fd = open(F2, O_CREAT | O_RDONLY, 0600);
     ck("建出只读文件（owner 写位被掩）", fd >= 0 && (mode_of(F2) & S_IWUSR) == 0);
     if (fd >= 0) close(fd);
+    /* 5a. 降权前先确认自己**确实**是特权（否则下面的断言会因别的原因通过）。 */
+    unsigned int id[3] = {0xFFFFFFFFu, 0xFFFFFFFFu, 0xFFFFFFFFu};
+    int qrc = boruix_identity_query(id);
+    ck("identity_query 成功", qrc == 0);
+    ck("降权前持 CAP_OWNER(1<<4)（自动化通道的特权上下文）", (id[2] & (1u << 4)) != 0);
+
+    /* 5b. **主动降权**：caps 传 0。这是 POSIX setuid 表达不了的（它保留 caps）。 */
+    ck("boruix_identity_set(1000,1000,0) 成功", boruix_identity_set(1000, 1000, 0) == 0);
+    id[0] = id[1] = id[2] = 0xFFFFFFFFu;
+    ck("降权后 identity_query 成功", boruix_identity_query(id) == 0);
+    ck("降权后 uid==1000", id[0] == 1000);
+    ck("降权后 caps==0（CAP_OWNER 已摘掉）", id[2] == 0);
+
+    /* 5c. 现在断言**拦截**：F2 属主 uid 0、mode 0o444 ⇒ uid 1000 落 other 段（只有 r）。 */
     ck("只读文件对 O_WRONLY 被拒（拦截生效）", open(F2, O_WRONLY) < 0);
     ck("只读文件 access(W_OK) 为假", access(F2, W_OK) != 0);
-    ck("只读文件 access(R_OK) 为真", access(F2, R_OK) == 0);
+    ck("只读文件 access(R_OK) 为真（other 段有 r）", access(F2, R_OK) == 0);
     fd = open(F2, O_RDONLY);
     ck("只读文件对 O_RDONLY 放行", fd >= 0);
     if (fd >= 0) close(fd);
