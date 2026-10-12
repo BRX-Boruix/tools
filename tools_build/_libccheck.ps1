@@ -12,7 +12,7 @@ while ((Get-Date) -lt $dl) {
   Start-Sleep -Milliseconds 500
   if (Test-Path $log) {
     $c = Get-Content $log -ErrorAction SilentlyContinue
-    if ($c | Select-String -Pattern "run exited with code|zero-capacity|libccheck: " -Quiet) { Start-Sleep -Seconds 12; break }
+    if ($c | Select-String -Pattern "run exited with code" -Quiet) { Start-Sleep -Seconds 12; break }
   }
 }
 Stop-Process -Force -Id $proc.Id -ErrorAction SilentlyContinue
