@@ -60,6 +60,23 @@ int main(void) {
        mkdir(DIR, 0755) == 0 && (mode_of(DIR) & S_IRWXU) == S_IRWXU);
     (void)umask(0);
 
+    /* 5. **权限拦截是生效的** —— 本轮更正上一轮的错误结论。
+     *    上一轮我据 mu3 的 access(W_OK) 成功推断「内核 sys_open 不查 Permissions」，
+     *    那是**位序缺陷**造成的假象：0600 被记成 0o333（含 w）⇒ 自然可写。
+     *    修好后 0600&`0200 = 0o444 ⇒ O_WRONLY 必须被拒（EACCES）。 */
+    (void)unlink(F2);
+    (void)umask(0200);                       /* owner 写被掩 ⇒ 建出只读 */
+    fd = open(F2, O_CREAT | O_RDONLY, 0600);
+    ck("建出只读文件（owner 写位被掩）", fd >= 0 && (mode_of(F2) & S_IWUSR) == 0);
+    if (fd >= 0) close(fd);
+    ck("只读文件对 O_WRONLY 被拒（拦截生效）", open(F2, O_WRONLY) < 0);
+    ck("只读文件 access(W_OK) 为假", access(F2, W_OK) != 0);
+    ck("只读文件 access(R_OK) 为真", access(F2, R_OK) == 0);
+    fd = open(F2, O_RDONLY);
+    ck("只读文件对 O_RDONLY 放行", fd >= 0);
+    if (fd >= 0) close(fd);
+    (void)umask(0);
+
     (void)rmdir(DIR); (void)unlink(F1); (void)unlink(F2);
     printf("mode_umask_check: fails=%d\n", fails);
     return fails;
