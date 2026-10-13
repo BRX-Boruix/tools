@@ -43,6 +43,9 @@ OFFLINE_CHECKS = (
     "../libc/tools/audit_errno_sync.py",
     "../libc/tools/audit_stub_symbols.py",
     "../libc/tools/audit_header_coverage.py",
+    # 覆盖面：每个 C 可见导出要么被某个测试组**提到**，要么在 TRIAGED 里写明理由。
+    # 它把"审完全部 362 个导出"从一句声称变成可数的清单（名字出现只是下界）。
+    "../libc/tools/audit_conformance_coverage.py",
     # 数学核心的宿主对照验证器（独立 rustc 程序）。此前**存在但没人跑**——
     # 它无论超没超都退 0，故本项解析它自己打印的「超 B 档」列表而不是看退出码。
     "checks/dist/math_verify_runs.py",
