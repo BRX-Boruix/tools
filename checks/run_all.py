@@ -36,6 +36,8 @@ OFFLINE_CHECKS = (
     "checks/regression/abi_exports_selftest.py",
     # 发行物门禁：本项**自足**（只读仓库内两处源码做一致性核对），故登记。
     "checks/dist/confstr_path_agrees.py",
+    # 跨边界镜像常量门禁（syscall 号 / 错误码 / C 头常量 / 路径契约），同样自足。
+    "checks/dist/abi_mirrors_agree.py",
     # 另两项（headers_syntax / tcc_assets_fresh）**未登记**，因为它们需要前置：
     # 前者要 --sysroot + clang，后者要 --sysroot（`python tools/main.py install --prefix <dir>` 产出）。
     # 实测（2026-10）：带上 sysroot 后 tcc_assets_fresh 通过（[OK] 磁盘资产与构建产物一致），
