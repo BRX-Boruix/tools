@@ -43,6 +43,9 @@ OFFLINE_CHECKS = (
     "../libc/tools/audit_errno_sync.py",
     "../libc/tools/audit_stub_symbols.py",
     "../libc/tools/audit_header_coverage.py",
+    # 数学核心的宿主对照验证器（独立 rustc 程序）。此前**存在但没人跑**——
+    # 它无论超没超都退 0，故本项解析它自己打印的「超 B 档」列表而不是看退出码。
+    "checks/dist/math_verify_runs.py",
     # 另两项（headers_syntax / tcc_assets_fresh）**未登记**，因为它们需要前置：
     # 前者要 --sysroot + clang，后者要 --sysroot（`python tools/main.py install --prefix <dir>` 产出）。
     # 实测（2026-10）：带上 sysroot 后 tcc_assets_fresh 通过（[OK] 磁盘资产与构建产物一致），
