@@ -237,9 +237,15 @@ def check_header_consts():
 PATH_CONTRACTS = (
     ("console 实例节点目录", (
         ("kernel/crates/vfs/src/devfs.rs", r'root\.add_child\("(consoles)"'),
-        ("init/src/main.rs", r'PREFIX: &\[u8\] = b"(/devices/consoles/)"'),
-        ("libsys/src/event.rs", r'format!\("(/devices/consoles/)\{\}"'),
-        ("login/src/main.rs", r'format!\("(/devices/consoles/)\{\}"'),
+        ("libsys/src/event.rs", r'CONSOLES_DIR_PREFIX: &str = "(/devices/consoles/)"'),
+    )),
+    # 2026-10-14：**用户态收成一处**。init/login 原本各写一份字面量（PREFIX / format!），
+    # 现都从 libsys::CONSOLES_DIR_PREFIX 派生 ⇒ 上面那条契约只剩「内核建目录」与
+    # 「用户态前缀」两个站点。这一条钉住两个引用方**必须**继续引用该常量——
+    # 否则有人改回字面量时，上面那条契约仍然"通过"（因为它只看两个站点）。
+    ("console 用户态前缀的引用方", (
+        ("init/src/main.rs", r'libsys::(CONSOLES_DIR_PREFIX)'),
+        ("login/src/main.rs", r'libsys::(CONSOLES_DIR_PREFIX)'),
     )),
     # 2026-10-13：init 里原本三处各写一遍（CONSOLE_REQUESTS_DIR / make_request_path 的
     # PREFIX / drop_bad_name_request 的 DIRP），已收敛为一处常量、其余**派生**；本契约因此
@@ -515,7 +521,8 @@ def check_token_contracts():
 # 只数**代码行**里的出现次数（以 // 开头的注释行不计）——注释里提一句不算第二份事实。
 SINGLE_LITERAL = (
     ("console 请求目录（init 内）", "init/src/main.rs", "/system/console-requests"),
-    ("console 实例节点目录（init 内）", "init/src/main.rs", "/devices/consoles/"),
+    # 用户态单一事实源已从 init 移到 libsys（init/login 改为派生）。
+    ("console 实例节点目录（用户态单一事实源）", "libsys/src/event.rs", "/devices/consoles/"),
 )
 
 
