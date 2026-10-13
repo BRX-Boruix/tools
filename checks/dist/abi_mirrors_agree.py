@@ -474,6 +474,10 @@ def check_struct_layouts():
 # 而用户态把 /volumes/BORUIX_DATA/... 写死在多处。改一处而不改另一处，
 # 表现为"数据盘在，但 /volumes/BORUIX_DATA 不存在"，且没有任何东西会报错。
 TOKEN_CONTRACTS = (
+    ("3p 子目录名（tcc 安装目录 ↔ 宿主 staging）", (
+        ("tcc-on-boruix/boruix/config.h", r'CONFIG_TCCDIR "/volumes/BORUIX_DATA/([A-Za-z0-9_]+)/tcc"'),
+        ("tools/tools_build/b3p.py", r'THIRD_PARTY_SUBDIR = "([A-Za-z0-9_]+)"'),
+    )),
     ("数据盘卷标", (
         ("tools/main.py", r'--label",\s*default="([A-Za-z0-9_]+)"'),
         ("tools/tools_build/disk.py", r'def create_ext2_disk_image\([^)]*label="([A-Za-z0-9_]+)"'),
