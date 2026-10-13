@@ -37,13 +37,8 @@ LIBSYS_ERROR = os.path.join("libsys", "src", "error.rs")
 
 # 只在单侧存在、且**已判定为有意**的项。判定理由必须写在这里；新增的不对称一律算失败，
 # 因为"内核实现了而用户态接不上"（S28）与"用户态引用了不存在的号"都是真缺陷。
-TRIAGED_ASYMMETRY = {
-    "SYS_STREAM_LOCK": (
-        "仅内核侧：vfs flock 表（ADR-033 A2-1 R6）的 syscall 面，当前只被内核自测调用，"
-        "libsys 未导出调用号、libc 未导出 flock()。ADR-014 §4.1 仍把 LOCK_SH/LOCK_EX 标为"
-        "声明式开放项，故先如实登记为不对称，待 flock() 落地时删除本项。"
-    ),
-}
+# 当前为空：SYS_STREAM_LOCK 的双侧不对称已随 flock() 落地而消解（2026-10-13）。
+TRIAGED_ASYMMETRY = {}
 
 KNOWN_INTS = {
     "i32::MAX": 2147483647,
@@ -244,10 +239,11 @@ PATH_CONTRACTS = (
         ("libsys/src/event.rs", r'format!\("(/devices/consoles/)\{\}"'),
         ("login/src/main.rs", r'format!\("(/devices/consoles/)\{\}"'),
     )),
+    # 2026-10-13：init 里原本三处各写一遍（CONSOLE_REQUESTS_DIR / make_request_path 的
+    # PREFIX / drop_bad_name_request 的 DIRP），已收敛为一处常量、其余**派生**；本契约因此
+    # 只剩一个站点，另外由下面的「单点字面量」检查钉住"不许再出现第二份"。
     ("console 请求目录", (
         ("init/src/main.rs", r'CONSOLE_REQUESTS_DIR: &str = "(/system/console-requests)"'),
-        ("init/src/main.rs", r'PREFIX: &\[u8\] = b"(/system/console-requests/)"'),
-        ("init/src/main.rs", r'DIRP: &\[u8\] = b"(/system/console-requests/)"'),
     )),
 )
 
@@ -300,6 +296,18 @@ VALUE_MIRRORS = (
     ("_PC_PIPE_BUF", (
         ("libc/src/unistd.rs", r"_PC_PIPE_BUF => (\d+)"),
         ("kernel/crates/ipc/src/lib.rs", r"pub const PIPE_CAPACITY: usize = (\d+);"),
+    )),
+    ("flock 命令字 SHARED", (
+        ("kernel/crates/kernel/src/syscall.rs", r"pub const FLOCK_CMD_SHARED: u64 = (\d+);"),
+        ("libsys/src/nr.rs", r"pub const FLOCK_CMD_SHARED: u64 = (\d+);"),
+    )),
+    ("flock 命令字 EXCLUSIVE", (
+        ("kernel/crates/kernel/src/syscall.rs", r"pub const FLOCK_CMD_EXCLUSIVE: u64 = (\d+);"),
+        ("libsys/src/nr.rs", r"pub const FLOCK_CMD_EXCLUSIVE: u64 = (\d+);"),
+    )),
+    ("flock 命令字 UNLOCK", (
+        ("kernel/crates/kernel/src/syscall.rs", r"pub const FLOCK_CMD_UNLOCK: u64 = (\d+);"),
+        ("libsys/src/nr.rs", r"pub const FLOCK_CMD_UNLOCK: u64 = (\d+);"),
     )),
 )
 
@@ -497,6 +505,237 @@ def check_token_contracts():
     return ok
 
 
+# 「同一字面量只许出现一次」：S13 单点化的机械判据。
+# 只数**代码行**里的出现次数（以 // 开头的注释行不计）——注释里提一句不算第二份事实。
+SINGLE_LITERAL = (
+    ("console 请求目录（init 内）", "init/src/main.rs", "/system/console-requests"),
+    ("console 实例节点目录（init 内）", "init/src/main.rs", "/devices/consoles/"),
+)
+
+
+def check_single_literal():
+    ok = True
+    print("[abi-mirror] 单点字面量：%d 条" % len(SINGLE_LITERAL))
+    for label, rel, lit in SINGLE_LITERAL:
+        count = 0
+        for line in read(rel).splitlines():
+            if line.strip().startswith("//"):
+                continue
+            count += line.count(lit)
+        if count != 1:
+            print("  FAIL %s：%s 在代码里出现 %d 次（应为 1 次）" % (label, repr(lit), count))
+            ok = False
+        else:
+            print("  OK   %s = %s（唯一）" % (label, repr(lit)))
+    return ok
+
+
+# ---------- 9. 结构体字段宽度（类型） ----------
+
+# 字段**宽度类**表：只比宽度，不比精确类型——宽度错位（C 的 long vs Rust 的 i32）
+# 才是静默 ABI 损坏；同宽度的不同写法（unsigned long vs u64）不是缺陷。
+_C_SCALAR = {
+    "char": 1, "signed char": 1, "unsigned char": 1, "_Bool": 1, "bool": 1,
+    "short": 2, "short int": 2, "unsigned short": 2, "unsigned short int": 2,
+    "int": 4, "signed int": 4, "unsigned": 4, "unsigned int": 4, "float": 4,
+    "long": 8, "long int": 8, "unsigned long": 8, "unsigned long int": 8,
+    "long long": 8, "unsigned long long": 8, "double": 8, "long double": 8,
+    # <stdint.h> 由**编译器内置**提供（本仓的 inttypes.h 只是 include 它），
+    # 故这些名字不在我们的 typedef 表里；LP64 下宽度如下。
+    "int8_t": 1, "uint8_t": 1, "int16_t": 2, "uint16_t": 2,
+    "int32_t": 4, "uint32_t": 4, "int64_t": 8, "uint64_t": 8,
+    "intmax_t": 8, "uintmax_t": 8, "intptr_t": 8, "uintptr_t": 8, "ptrdiff_t": 8,
+}
+_RUST_SCALAR = {
+    "i8": 1, "u8": 1, "c_char": 1, "c_uchar": 1, "bool": 1,
+    "i16": 2, "u16": 2, "c_ushort": 2,
+    "i32": 4, "u32": 4, "c_int": 4, "c_uint": 4, "f32": 4, "AtomicI32": 4,
+    "i64": 8, "u64": 8, "c_long": 8, "c_ulong": 8, "usize": 8, "isize": 8,
+    "f64": 8, "AtomicU64": 8, "c_longlong": 8, "c_ulonglong": 8,
+}
+
+
+def _c_typedefs():
+    out = {}
+    for p in walk(os.path.join("libc", "include"), ".h"):
+        txt = re.sub(r"/\*.*?\*/", " ", open(p, encoding="utf-8").read(), flags=re.S)
+        txt = re.sub(r"//[^\n]*", " ", txt)
+        for m in re.finditer(r"typedef\s+([^;{}]+?)\s+([A-Za-z_][A-Za-z0-9_]*)\s*;", txt):
+            out[m.group(2)] = m.group(1).strip()
+        # 函数指针 typedef：上面的正则取不到名字，但它就是指针。
+        for m in re.finditer(r"typedef\s+[^;{}]*?\(\s*\*\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)", txt):
+            out[m.group(1)] = "void *"
+    return out
+
+
+def _rust_typedefs():
+    """扫**全部** libc/src（不只 ctypes.rs）：sighandler_t/sigset_t 定义在 signal.rs。"""
+    out = {}
+    for p in walk(os.path.join("libc", "src"), ".rs"):
+        txt = open(p, encoding="utf-8").read()
+        for m in re.finditer(r"pub type ([A-Za-z_][A-Za-z0-9_]*)\s*=\s*([^;]+);", txt):
+            out.setdefault(m.group(1), m.group(2).strip())
+    return out
+
+
+def _rust_consts():
+    """Rust 整数常量表：数组长度写成常量名（`[spawn_action; SPAWN_MAX_ACTIONS]`）时要能求值。"""
+    out = {}
+    for p in walk(os.path.join("libc", "src"), ".rs"):
+        txt = open(p, encoding="utf-8").read()
+        for m in re.finditer(r"pub const ([A-Za-z_][A-Za-z0-9_]*)\s*:\s*[A-Za-z0-9_]+\s*=\s*(\d+)\s*;", txt):
+            out[m.group(1)] = int(m.group(2))
+    return out
+
+
+_RUST_CONSTS = {}
+
+
+def _shape_of(parts):
+    """把子形状列表折成一个形状；任一项建模不了则整体建模不了。"""
+    return None if any(x is None for x in parts) else tuple(parts)
+
+
+def _c_shape(t, typedefs, structs, depth=0):
+    """返回字段的**形状**：标量=字节数、数组=(arr,N,内层)、嵌套结构=子形状元组、指针=8。
+    None 表示建模不了（调用方跳过该结构，而不是猜）。"""
+    t = " ".join(t.split())
+    t = t.replace("volatile ", "").replace("const ", "").replace("register ", "").strip()
+    if t.endswith("*"):
+        return 8
+    m = re.match(r"(.+?)\s*\[\s*(\d+)\s*\]$", t)
+    if m:
+        inner = _c_shape(m.group(1), typedefs, structs, depth + 1)
+        return None if inner is None else ("arr", int(m.group(2)), inner)
+    if t in _C_SCALAR:
+        return _C_SCALAR[t]
+    if t.startswith("struct ") or t.startswith("union "):
+        name = t.split(None, 1)[1].strip()
+        if depth < 6 and name in structs:
+            return _shape_of([_c_shape(x, typedefs, structs, depth + 1) for x in structs[name]])
+        return None
+    if depth < 8 and t in typedefs:
+        return _c_shape(typedefs[t], typedefs, structs, depth + 1)
+    return None
+
+
+def _rust_shape(t, typedefs, structs, depth=0):
+    t = " ".join(t.split())
+    if "::" in t and "[" not in t and "(" not in t:
+        t = t.split("::")[-1].strip()
+    if "*mut" in t or "*const" in t or t.startswith("&"):
+        return 8
+    m = re.match(r"\[(.+?);\s*([A-Za-z_][A-Za-z0-9_]*|\d+)\]$", t)
+    if m:
+        inner = _rust_shape(m.group(1), typedefs, structs, depth + 1)
+        n = m.group(2)
+        n = int(n) if n.isdigit() else _RUST_CONSTS.get(n)
+        return None if inner is None or n is None else ("arr", n, inner)
+    if t in _RUST_SCALAR:
+        return _RUST_SCALAR[t]
+    if depth < 6 and t in structs:
+        return _shape_of([_rust_shape(x, typedefs, structs, depth + 1) for x in structs[t]])
+    if depth < 8 and t in typedefs:
+        return _rust_shape(typedefs[t], typedefs, structs, depth + 1)
+    return None
+
+
+def _field_types(body, lang):
+    """从结构体正文里取每个字段的**类型文本**（按出现顺序）。
+
+    C 侧取「声明里最后一个标识符」当字段名，其**前面**的部分即类型；数组维度跟在
+    字段名之后，要并回类型里（否则宽度会漏乘）。指针声明（`char **p`）也必须能取到名字。
+    """
+    out = []
+    if lang == "c":
+        body = re.sub(r"/\*.*?\*/", " ", body, flags=re.S)
+        body = re.sub(r"//[^\n]*", " ", body)
+        for part in body.split(";"):
+            s = part.strip()
+            if not s or s.startswith("#"):
+                continue
+            m = re.search(r"([A-Za-z_][A-Za-z0-9_]*)\s*(\[[^\]]*\])?\s*(?::\s*\d+)?$", s)
+            if not m:
+                continue
+            type_text = s[: m.start()].strip()
+            if m.group(2):
+                type_text = (type_text + " " + m.group(2)).strip()
+            if type_text:
+                out.append(type_text)
+    else:
+        for m in re.finditer(r"pub\s+[A-Za-z_][A-Za-z0-9_]*\s*:\s*([^,]+?)\s*,", body):
+            out.append(m.group(1).strip())
+    return out
+
+
+def _rust_field_types():
+    """Rust 侧：结构名 -> 字段类型列表（与 _rust_repr_c_structs 同源同序）。"""
+    out = {}
+    for p in walk(os.path.join("libc", "src"), ".rs"):
+        lines = open(p, encoding="utf-8").read().splitlines()
+        for i, line in enumerate(lines):
+            m = _RUST_STRUCT.match(line.strip())
+            if not m:
+                continue
+            if "repr(C)" not in "\n".join(lines[max(0, i - 4):i + 1]):
+                continue
+            body, _ = _struct_body(lines, i)
+            out[m.group(1)] = _field_types(body, "rust")
+    return out
+
+
+def check_struct_widths():
+    global _RUST_CONSTS
+    ctd, rtd = _c_typedefs(), _rust_typedefs()
+    _RUST_CONSTS = _rust_consts()
+    rust = _rust_field_types()
+    cstructs = {}
+    for p in walk(os.path.join("libc", "include"), ".h"):
+        lines = open(p, encoding="utf-8").read().splitlines()
+        i = 0
+        while i < len(lines):
+            named, anon = _C_NAMED.match(lines[i]), _C_ANON.match(lines[i])
+            if not named and not anon:
+                i += 1
+                continue
+            body, end = _struct_body(lines, i)
+            tm = re.search(r"\}\s*([A-Za-z_][A-Za-z0-9_]*)\s*;", lines[end] if end < len(lines) else "")
+            for nm in ([named.group(1)] if named else []) + ([tm.group(1)] if tm else []):
+                cstructs.setdefault(nm, _field_types(body, "c"))
+            i = end + 1
+    ok = True
+    compared, skipped = 0, []
+    for rname, rfields in sorted(rust.items()):
+        if rname in STRUCT_EXEMPT:
+            continue
+        cname = STRUCT_ALIASES.get(rname, rname)
+        if cname not in cstructs:
+            continue
+        ctypes = cstructs[cname]
+        if len(ctypes) != len(rfields):
+            continue  # 字段数不同：顺序检查已报
+        widths = []
+        for ct, rt in zip(ctypes, rfields):
+            cw = _c_shape(ct, ctd, cstructs)
+            rw = _rust_shape(rt, rtd, rust)
+            if cw is None or rw is None:
+                widths = None
+                break
+            widths.append((ct, rt, cw, rw))
+        if widths is None:
+            skipped.append(rname)
+            continue
+        compared += 1
+        for ct, rt, cw, rw in widths:
+            if cw != rw:
+                print("  FAIL %s：字段形状不一致  C(%s)=%s  Rust(%s)=%s" % (rname, ct, cw, rt, rw))
+                ok = False
+    print("[abi-mirror] 结构体字段形状：比对 %d 个，跳过（含未建模类型）%d 个" % (compared, len(skipped)))
+    if skipped:
+        print("       跳过：%s" % ", ".join(sorted(skipped)))
+    return ok
+
+
 def main():
     results = [
         ("syscall 号", check_syscall_table()),
@@ -506,6 +745,8 @@ def main():
         ("数值镜像", check_value_mirrors()),
         ("结构体布局", check_struct_layouts()),
         ("单 token 契约", check_token_contracts()),
+        ("单点字面量", check_single_literal()),
+        ("结构体字段宽度", check_struct_widths()),
     ]
     failed = [n for n, ok in results if not ok]
     if failed:

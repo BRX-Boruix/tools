@@ -38,6 +38,11 @@ OFFLINE_CHECKS = (
     "checks/dist/confstr_path_agrees.py",
     # 跨边界镜像常量门禁（syscall 号 / 错误码 / C 头常量 / 路径契约），同样自足。
     "checks/dist/abi_mirrors_agree.py",
+    # libc 侧的三项自足审计（纯源码扫描，不需 sysroot/clang）：errno 常量两侧一致、
+    # 桩符号清单无新增、C 可见导出都有头文件声明（内部符号须在 TRIAGED_INTERNAL 登记）。
+    "../libc/tools/audit_errno_sync.py",
+    "../libc/tools/audit_stub_symbols.py",
+    "../libc/tools/audit_header_coverage.py",
     # 另两项（headers_syntax / tcc_assets_fresh）**未登记**，因为它们需要前置：
     # 前者要 --sysroot + clang，后者要 --sysroot（`python tools/main.py install --prefix <dir>` 产出）。
     # 实测（2026-10）：带上 sysroot 后 tcc_assets_fresh 通过（[OK] 磁盘资产与构建产物一致），
