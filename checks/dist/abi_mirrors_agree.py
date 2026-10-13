@@ -204,7 +204,9 @@ def check_header_consts():
     rs = {}
     for p in walk(os.path.join("libc", "src"), ".rs"):
         txt = open(p, encoding="utf-8").read()
-        for m in re.finditer(r"pub const ([A-Za-z_][A-Za-z0-9_]*)\s*:\s*[^=;]+?=\s*([^;]+);", txt):
+        # **pub 与非 pub 都扫**：同名私有常量同样是"与头文件必须一致"的镜像，
+        # 只扫 pub 会让这一类（实测 FP_*/BUFSIZ 共 6 个）完全逃过核对。
+        for m in re.finditer(r"(?:pub\s+)?const ([A-Za-z_][A-Za-z0-9_]*)\s*:\s*[^=;]+?=\s*([^;]+);", txt):
             rs.setdefault(m.group(1), []).append((m.group(2).strip(), os.path.relpath(p, ROOT), txt[:m.start()].count("\n") + 1))
     compared, bad, skipped = 0, [], []
     for name in sorted(set(hdr) & set(rs)):
