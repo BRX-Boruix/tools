@@ -297,59 +297,69 @@ def check_path_contracts():
     return ok
 
 
-# 跨 crate 的**数值**镜像：两侧不能共享常量（libc 与内核是两棵独立的编译单元），
-# 只能各写一份。每条 = (概念, [(文件, 抓出数字的正则)])；抓出的数必须全部相等。
-VALUE_MIRRORS = (
-    ("页大小 getpagesize()", (
-        ("libc/src/unistd.rs", r"fn getpagesize\(\) -> c_int \{\s*(\d+)"),
-        ("kernel/crates/vfs/src/page_cache.rs", r"pub const PAGE_SIZE: usize = (\d+);"),
-    )),
-    ("_PC_PATH_MAX", (
-        ("libc/src/unistd.rs", r"_PC_PATH_MAX => (\d+)"),
-        ("kernel/crates/kernel/src/syscall.rs", r"const MAX_USER_PATH_BYTES: usize = (\d+);"),
-    )),
-    ("_PC_NAME_MAX", (
-        ("libc/src/unistd.rs", r"_PC_NAME_MAX => (\d+)"),
-        ("kernel/crates/vfs/src/mount.rs", r"pub const MAX_NAME_BYTES: usize = (\d+);"),
-    )),
-    ("_PC_PIPE_BUF", (
-        ("libc/src/unistd.rs", r"_PC_PIPE_BUF => (\d+)"),
-        ("kernel/crates/ipc/src/lib.rs", r"pub const PIPE_CAPACITY: usize = (\d+);"),
-    )),
-    ("flock 命令字 SHARED", (
-        ("kernel/crates/kernel/src/syscall.rs", r"pub const FLOCK_CMD_SHARED: u64 = (\d+);"),
-        ("libsys/src/nr.rs", r"pub const FLOCK_CMD_SHARED: u64 = (\d+);"),
-    )),
-    ("flock 命令字 EXCLUSIVE", (
-        ("kernel/crates/kernel/src/syscall.rs", r"pub const FLOCK_CMD_EXCLUSIVE: u64 = (\d+);"),
-        ("libsys/src/nr.rs", r"pub const FLOCK_CMD_EXCLUSIVE: u64 = (\d+);"),
-    )),
-    ("flock 命令字 UNLOCK", (
-        ("kernel/crates/kernel/src/syscall.rs", r"pub const FLOCK_CMD_UNLOCK: u64 = (\d+);"),
-        ("libsys/src/nr.rs", r"pub const FLOCK_CMD_UNLOCK: u64 = (\d+);"),
-    )),
+# ---------- 5. 跨 crate 数值 ----------
+#
+# **2026-10-14 起改为「生成 + 接线检查」**（与第 1、2 类同一改法）。此前这些数值在
+# 三四个仓库各写一份、本类比对；现在唯一事实源是 tools/abi/constants.json，
+# 各侧由 tools/abi/generate.py 生成。故本类改查**接线**：每个站点必须引用
+# crate::abi_generated::*，且不得再写死数字。
+#
+# 覆盖面：页大小、路径上限、名字上限、管道块、flock 三个命令字（kernel 与 libsys 两侧）、
+# 以及 libc 的 getpagesize/pathconf 四个出口。
+
+VALUE_WIRING = (
+    ("页大小", "kernel/crates/vfs/src/page_cache.rs",
+     r"pub const PAGE_SIZE: usize = crate::abi_generated::PAGE_SIZE;"),
+    ("路径上限", "kernel/crates/kernel/src/syscall.rs",
+     r"const MAX_USER_PATH_BYTES: usize = crate::abi_generated::PATH_MAX;"),
+    ("名字上限", "kernel/crates/vfs/src/mount.rs",
+     r"pub const MAX_NAME_BYTES: usize = crate::abi_generated::NAME_MAX;"),
+    ("管道块", "kernel/crates/ipc/src/lib.rs",
+     r"pub const PIPE_CAPACITY: usize = crate::abi_generated::PIPE_BUF;"),
+    ("flock SHARED（内核）", "kernel/crates/kernel/src/syscall.rs",
+     r"pub const FLOCK_CMD_SHARED: u64 = crate::abi_generated::FLOCK_CMD_SHARED;"),
+    ("flock EXCLUSIVE（内核）", "kernel/crates/kernel/src/syscall.rs",
+     r"pub const FLOCK_CMD_EXCLUSIVE: u64 = crate::abi_generated::FLOCK_CMD_EXCLUSIVE;"),
+    ("flock UNLOCK（内核）", "kernel/crates/kernel/src/syscall.rs",
+     r"pub const FLOCK_CMD_UNLOCK: u64 = crate::abi_generated::FLOCK_CMD_UNLOCK;"),
+    ("flock SHARED（用户态）", "libsys/src/nr.rs",
+     r"pub const FLOCK_CMD_SHARED: u64 = crate::abi_generated::FLOCK_CMD_SHARED;"),
+    ("flock EXCLUSIVE（用户态）", "libsys/src/nr.rs",
+     r"pub const FLOCK_CMD_EXCLUSIVE: u64 = crate::abi_generated::FLOCK_CMD_EXCLUSIVE;"),
+    ("flock UNLOCK（用户态）", "libsys/src/nr.rs",
+     r"pub const FLOCK_CMD_UNLOCK: u64 = crate::abi_generated::FLOCK_CMD_UNLOCK;"),
+    ("getpagesize", "libc/src/unistd.rs", r"crate::abi_generated::PAGE_SIZE"),
+    ("_PC_PATH_MAX", "libc/src/unistd.rs", r"_PC_PATH_MAX => crate::abi_generated::PATH_MAX,"),
+    ("_PC_NAME_MAX", "libc/src/unistd.rs", r"_PC_NAME_MAX => crate::abi_generated::NAME_MAX,"),
+    ("_PC_PIPE_BUF", "libc/src/unistd.rs", r"_PC_PIPE_BUF => crate::abi_generated::PIPE_BUF,"),
+)
+
+# 这些常量**不得**再写死数字（写死即绕过生成物）。
+VALUE_HARDCODED = (
+    ("kernel/crates/kernel/src/syscall.rs", r"const MAX_USER_PATH_BYTES: usize = \d+;"),
+    ("kernel/crates/vfs/src/page_cache.rs", r"pub const PAGE_SIZE: usize = \d+;"),
+    ("kernel/crates/vfs/src/mount.rs", r"pub const MAX_NAME_BYTES: usize = \d+;"),
+    ("kernel/crates/ipc/src/lib.rs", r"pub const PIPE_CAPACITY: usize = \d+;"),
+    ("kernel/crates/kernel/src/syscall.rs", r"pub const FLOCK_CMD_[A-Z]+: u64 = \d+;"),
+    ("libsys/src/nr.rs", r"pub const FLOCK_CMD_[A-Z]+: u64 = \d+;"),
+    ("libc/src/unistd.rs", r"_PC_(?:PATH_MAX|NAME_MAX|PIPE_BUF) => -?\d+,"),
 )
 
 
 def check_value_mirrors():
     ok = True
-    print("[abi-mirror] 跨 crate 数值镜像：%d 条" % len(VALUE_MIRRORS))
-    for concept, sites in VALUE_MIRRORS:
-        found = []
-        for rel, pattern in sites:
-            m = re.search(pattern, read(rel))
-            if not m:
-                print("  FAIL %s：在 %s 里解析不出数值（正则 %s）" % (concept, rel, pattern))
-                ok = False
-                continue
-            found.append((int(m.group(1)), rel))
-        if len({v for v, _ in found}) > 1:
-            print("  FAIL %s：两侧数值不一致" % concept)
-            for v, rel in found:
-                print("        %-8d %s" % (v, rel))
+    print("[abi-mirror] 跨 crate 数值：单一事实源 %s，%d 个站点" % (ABI_JSON, len(VALUE_WIRING)))
+    for concept, rel, pat in VALUE_WIRING:
+        if not re.search(pat, read(rel)):
+            print("  FAIL %s：%s 里没有引用生成物（应匹配 %s）" % (concept, rel, pat))
             ok = False
-        elif found:
-            print("  OK   %s = %d（%d 处）" % (concept, found[0][0], len(found)))
+    for rel, pat in VALUE_HARDCODED:
+        m = re.search(pat, read(rel))
+        if m:
+            print("  FAIL %s 里仍有写死的数值：%s" % (rel, m.group(0)))
+            ok = False
+    if ok:
+        print("  OK   %d 个站点全部引用生成物，且无写死数值" % len(VALUE_WIRING))
     return ok
 
 

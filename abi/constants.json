@@ -414,5 +414,14 @@
       "errno": 16,
       "c": "EBUSY"
     }
+  },
+  "values": {
+    "PAGE_SIZE": 4096,
+    "PATH_MAX": 4096,
+    "NAME_MAX": 255,
+    "PIPE_BUF": 4096,
+    "FLOCK_CMD_SHARED": 0,
+    "FLOCK_CMD_EXCLUSIVE": 1,
+    "FLOCK_CMD_UNLOCK": 2
   }
 }

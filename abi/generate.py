@@ -8,9 +8,12 @@
 
 ## 生成物（勿手改）
 
-  kernel/crates/kernel/src/abi_generated.rs    syscall 号
+  kernel/crates/kernel/src/abi_generated.rs    syscall 号 + PATH_MAX + FLOCK_CMD_*
   kernel/crates/klib/src/abi_generated.rs      Error -> errno
-  libsys/src/abi_generated.rs                  syscall 号 + errno 双向映射
+  kernel/crates/vfs/src/abi_generated.rs       PAGE_SIZE / NAME_MAX
+  kernel/crates/ipc/src/abi_generated.rs       PIPE_BUF
+  libsys/src/abi_generated.rs                  syscall 号 + errno 双向 + FLOCK_CMD_*
+  libc/src/abi_generated.rs                    PAGE_SIZE / PATH_MAX / NAME_MAX / PIPE_BUF
 
 两侧手写文件只保留**文档**，取值改为引用生成物；libc 的 errno 表是**超集**
 （134 个 POSIX 名，其中 23 个有内核对应），故不生成，改为**核对**。
@@ -19,11 +22,11 @@
 
   python tools/abi/generate.py --check      # 不带参数即 --check
 
-1. 三份生成物与 JSON 逐字节一致（手改生成物会被抓住）；
+1. 各份生成物与 JSON 逐字节一致（手改生成物会被抓住）；
 2. 两侧手写 domain/op 取值与 JSON 一致，且没有写死的 SYS_* 数值；
 3. 两侧手写 error.rs 的 to_errno/from_errno 必须**委托**生成物，且没有残留的裸映射臂；
 4. libc 的 errno.h 与 errno.rs 里，JSON 记的 23 个 C 名必须存在且同值
-   （libc 的表是超集，只核对这 23 个——今天**没有任何检查**把内核的
+   （libc 的表是超集，只核对这 23 个——此前**没有任何检查**把内核的
    Error::NotFound => 2 与 libc 的 #define ENOENT 2 连起来）。
 """
 import argparse
@@ -52,7 +55,11 @@ HEADER = """//! **自动生成，请勿手改。**
 
 K_SYSCALL_GEN = os.path.join(ROOT, "kernel", "crates", "kernel", "src", "abi_generated.rs")
 K_KLIB_GEN = os.path.join(ROOT, "kernel", "crates", "klib", "src", "abi_generated.rs")
+K_VFS_GEN = os.path.join(ROOT, "kernel", "crates", "vfs", "src", "abi_generated.rs")
+K_IPC_GEN = os.path.join(ROOT, "kernel", "crates", "ipc", "src", "abi_generated.rs")
 L_GEN = os.path.join(ROOT, "libsys", "src", "abi_generated.rs")
+LIBC_GEN = os.path.join(ROOT, "libc", "src", "abi_generated.rs")
+
 K_SYSCALL_HAND = os.path.join(ROOT, "kernel", "crates", "kernel", "src", "syscall.rs")
 L_NR_HAND = os.path.join(ROOT, "libsys", "src", "nr.rs")
 K_ERR_HAND = os.path.join(ROOT, "kernel", "crates", "klib", "src", "error.rs")
@@ -60,10 +67,25 @@ L_ERR_HAND = os.path.join(ROOT, "libsys", "src", "error.rs")
 LIBC_ERRNO_H = os.path.join(ROOT, "libc", "include", "errno.h")
 LIBC_ERRNO_RS = os.path.join(ROOT, "libc", "src", "errno.rs")
 
+# 每份生成物要带哪些数值：(JSON 里的名字, 该侧 Rust 类型)
+KERNEL_VALUES = (("PATH_MAX", "usize"), ("FLOCK_CMD_SHARED", "u64"),
+                 ("FLOCK_CMD_EXCLUSIVE", "u64"), ("FLOCK_CMD_UNLOCK", "u64"))
+VFS_VALUES = (("PAGE_SIZE", "usize"), ("NAME_MAX", "usize"))
+IPC_VALUES = (("PIPE_BUF", "usize"),)
+LIBSYS_VALUES = (("FLOCK_CMD_SHARED", "u64"), ("FLOCK_CMD_EXCLUSIVE", "u64"), ("FLOCK_CMD_UNLOCK", "u64"))
+LIBC_VALUES = (("PAGE_SIZE", "c_int"), ("PATH_MAX", "c_long"), ("NAME_MAX", "c_long"), ("PIPE_BUF", "c_long"))
+
 
 def load():
     with open(JSON_PATH, encoding="utf-8") as fh:
         return json.load(fh)
+
+
+def render_values(doc, entries):
+    out = ["\n// ---------- 跨 crate 数值（同一数值只在这里写一次） ----------\n\n"]
+    for name, ty in entries:
+        out.append("pub const %s: %s = %d;\n" % (name, ty, doc["values"][name]))
+    return "".join(out)
 
 
 def render_syscalls(doc, dom_path, op_path):
@@ -109,18 +131,40 @@ def render_libsys_errno(doc):
 
 
 GEN_FILES = (
-    ("kernel:syscalls", K_SYSCALL_GEN,
-     lambda doc: render_syscalls(doc, "crate::syscall::domain", "crate::syscall::op")),
-    ("kernel:errors", K_KLIB_GEN, render_kernel_errno),
-    ("libsys:all", L_GEN,
-     lambda doc: render_syscalls(doc, "crate::nr::domain", "crate::nr::op") + render_libsys_errno(doc)),
+    ("kernel:kernel", K_SYSCALL_GEN,
+     lambda doc: render_syscalls(doc, "crate::syscall::domain", "crate::syscall::op")
+     + render_values(doc, KERNEL_VALUES)),
+    ("kernel:klib", K_KLIB_GEN, render_kernel_errno),
+    ("kernel:vfs", K_VFS_GEN, lambda doc: HEADER.replace("@SRC@", SRC_REL) + render_values(doc, VFS_VALUES)),
+    ("kernel:ipc", K_IPC_GEN, lambda doc: HEADER.replace("@SRC@", SRC_REL) + render_values(doc, IPC_VALUES)),
+    ("libsys", L_GEN,
+     lambda doc: render_syscalls(doc, "crate::nr::domain", "crate::nr::op")
+     + render_libsys_errno(doc) + render_values(doc, LIBSYS_VALUES)),
+    ("libc", LIBC_GEN, lambda doc: HEADER.replace("@SRC@", SRC_REL)
+     + "use crate::ctypes::{c_int, c_long};\n" + render_values(doc, LIBC_VALUES)),
 )
 
+# (标签, 手写文件, 是否检查 domain/op, 是否检查 errno 委托, 是否检查数值引用)
 HAND_FILES = (
-    ("kernel:syscall.rs", K_SYSCALL_HAND, True, False),
-    ("libsys:nr.rs", L_NR_HAND, True, False),
-    ("kernel:klib/error.rs", K_ERR_HAND, False, True),
-    ("libsys:error.rs", L_ERR_HAND, False, True),
+    ("kernel:syscall.rs", K_SYSCALL_HAND, True, False, ("MAX_USER_PATH_BYTES", "FLOCK_CMD_")),
+    ("libsys:nr.rs", L_NR_HAND, True, False, ("FLOCK_CMD_",)),
+    ("kernel:klib/error.rs", K_ERR_HAND, False, True, ()),
+    ("libsys:error.rs", L_ERR_HAND, False, True, ()),
+)
+
+
+# 这些常量**不得**再写死数字（写死即绕过生成物）。与 abi_mirrors_agree 的第 5 类
+# 用同一份清单——变异测试发现：只查 syscall.rs / nr.rs 会漏掉 vfs/ipc/libc 三个站点
+# （把 PAGE_SIZE 写回 4096 时 generate.py 报 OK 而门禁报 FAIL，两个工具结论不一致）。
+VALUE_HARDCODED = (
+    ("kernel/crates/kernel/src/syscall.rs", r"const MAX_USER_PATH_BYTES: usize = \d+;"),
+    ("kernel/crates/vfs/src/page_cache.rs", r"pub const PAGE_SIZE: usize = \d+;"),
+    ("kernel/crates/vfs/src/mount.rs", r"pub const MAX_NAME_BYTES: usize = \d+;"),
+    ("kernel/crates/ipc/src/lib.rs", r"pub const PIPE_CAPACITY: usize = \d+;"),
+    ("kernel/crates/kernel/src/syscall.rs", r"pub const FLOCK_CMD_[A-Z]+: u64 = \d+;"),
+    ("libsys/src/nr.rs", r"pub const FLOCK_CMD_[A-Z]+: u64 = \d+;"),
+    ("libc/src/unistd.rs", r"_PC_(?:PATH_MAX|NAME_MAX|PIPE_BUF) => -?\d+,"),
+    ("libc/src/unistd.rs", r"fn getpagesize\(\) -> c_int \{\s*\d+"),
 )
 
 
@@ -156,7 +200,7 @@ def main():
         if a.write:
             with open(path, "w", encoding="utf-8", newline="\n") as fh:
                 fh.write(text)
-            print("[abi-gen] %-16s 已写入 %s" % (label, os.path.relpath(path, ROOT)))
+            print("[abi-gen] %-14s 已写入 %s" % (label, os.path.relpath(path, ROOT)))
             continue
         cur = open(path, encoding="utf-8", newline="").read() if os.path.isfile(path) else None
         if cur != text:
@@ -168,7 +212,7 @@ def main():
         return 0
 
     want = {"domain": doc["syscall_domains"], "op": doc["syscall_ops"]}
-    for label, path, chk_domop, chk_errno in HAND_FILES:
+    for label, path, chk_domop, chk_errno, val_prefixes in HAND_FILES:
         txt = open(path, encoding="utf-8").read()
         if chk_domop:
             hw = parse_handwritten_domop(path)
@@ -198,6 +242,18 @@ def main():
             if arms:
                 print("[abi-gen] FAIL %s：还残留 %d 条裸映射臂 %s" % (label, len(arms), arms[:3]))
                 ok = False
+        for pre in val_prefixes:
+            hard = [m.group(1) for m in re.finditer(
+                r"pub const (" + pre + r"[A-Z0-9_]*)\s*:\s*(?:u64|usize)\s*=\s*(?!crate::abi_generated::)\d+\s*;", txt)]
+            if hard:
+                print("[abi-gen] FAIL %s：数值常量还写死在手写文件里：%s" % (label, hard))
+                ok = False
+
+    for rel, pat in VALUE_HARDCODED:
+        m = re.search(pat, open(os.path.join(ROOT, rel), encoding="utf-8").read())
+        if m:
+            print("[abi-gen] FAIL %s 里仍有写死的数值：%s" % (rel, m.group(0)))
+            ok = False
 
     hdr = open(LIBC_ERRNO_H, encoding="utf-8").read()
     rs = open(LIBC_ERRNO_RS, encoding="utf-8").read()
@@ -215,9 +271,10 @@ def main():
             ok = False
 
     if ok:
-        print("[abi-gen] OK：3 份生成物与 JSON 一致；手写 domain/op 一致；errno 映射已委托；"
-              "libc 的 %d 个 errno 名与 JSON 同值（syscall %d 项 / error %d 项）"
-              % (len(doc["errors"]), len(doc["syscalls"]), len(doc["errors"])))
+        print("[abi-gen] OK：%d 份生成物与 JSON 一致；手写 domain/op 一致；errno 映射已委托；"
+              "libc 的 %d 个 errno 名同值（syscall %d / error %d / value %d）"
+              % (len(GEN_FILES), len(doc["errors"]), len(doc["syscalls"]), len(doc["errors"]),
+                 len(doc["values"])))
     return 0 if ok else 1
 
 
