@@ -320,5 +320,99 @@
       "domain": "VOLUME",
       "op": "WRITE"
     }
+  },
+  "errors": {
+    "OutOfMemory": {
+      "errno": 12,
+      "c": "ENOMEM"
+    },
+    "InvalidParam": {
+      "errno": 22,
+      "c": "EINVAL"
+    },
+    "OutOfRange": {
+      "errno": 34,
+      "c": "ERANGE"
+    },
+    "NotFound": {
+      "errno": 2,
+      "c": "ENOENT"
+    },
+    "AlreadyExists": {
+      "errno": 17,
+      "c": "EEXIST"
+    },
+    "NotSupported": {
+      "errno": 95,
+      "c": "ENOTSUP"
+    },
+    "WouldBlock": {
+      "errno": 11,
+      "c": "EAGAIN"
+    },
+    "Interrupted": {
+      "errno": 4,
+      "c": "EINTR"
+    },
+    "NoSpace": {
+      "errno": 28,
+      "c": "ENOSPC"
+    },
+    "Io": {
+      "errno": 5,
+      "c": "EIO"
+    },
+    "NotDirectory": {
+      "errno": 20,
+      "c": "ENOTDIR"
+    },
+    "IsDirectory": {
+      "errno": 21,
+      "c": "EISDIR"
+    },
+    "PermissionDenied": {
+      "errno": 13,
+      "c": "EACCES"
+    },
+    "BadAddress": {
+      "errno": 14,
+      "c": "EFAULT"
+    },
+    "NotEmpty": {
+      "errno": 39,
+      "c": "ENOTEMPTY"
+    },
+    "NameTooLong": {
+      "errno": 36,
+      "c": "ENAMETOOLONG"
+    },
+    "ArgListTooLong": {
+      "errno": 7,
+      "c": "E2BIG"
+    },
+    "TooManySymlinks": {
+      "errno": 40,
+      "c": "ELOOP"
+    },
+    "IllegalSeek": {
+      "errno": 29,
+      "c": "ESPIPE"
+    },
+    "ExecFormat": {
+      "errno": 8,
+      "c": "ENOEXEC"
+    },
+    "ReadOnly": {
+      "errno": 30,
+      "c": "EROFS"
+    },
+    "Corrupt": {
+      "errno": 117,
+      "c": "EUCLEAN"
+    },
+    "Busy": {
+      "errno": 16,
+      "c": "EBUSY"
+    }
   }
 }

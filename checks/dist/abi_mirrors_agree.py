@@ -158,50 +158,41 @@ def check_syscall_table():
 
 
 # ---------- 2. 错误码 ----------
+#
+# **2026-10-14 起改为「生成 + 接线检查」**（与第 1 类同一改法）。此前两侧各手写
+# to_errno/from_errno、本类比对数值与互逆性；现在数值的唯一事实源是
+# tools/abi/constants.json，两侧由 tools/abi/generate.py 生成。故本类改查**接线**：
+#   - 两侧的 to_errno（以及 libsys 的 from_errno）必须**委托** crate::abi_generated；
+#   - 两侧不得残留裸映射臂（Error::X => N）。
+# 数值一致、以及 libsys 的 from_errno 是 to_errno 的逆，由生成器从**同一份** JSON
+# 同时产出两侧而结构性成立；libc 的 errno.h/errno.rs 与 JSON 同值也由生成器核对。
 
-def parse_to_errno(rel):
-    txt = read(rel)
-    m = re.search(r"fn to_errno\(self\) -> i32 \{(.*?)\n    \}", txt, re.S)
-    if not m:
-        return None
-    out = {}
-    for arm in re.finditer(r"Error::([A-Za-z_][A-Za-z0-9_]*)\s*=>\s*(-?\d+)", m.group(1)):
-        out[arm.group(1)] = int(arm.group(2))
-    return out
-
-
-def parse_from_errno(rel):
-    txt = read(rel)
-    m = re.search(r"fn from_errno\(e: i32\) -> Self \{(.*?)\n    \}", txt, re.S)
-    if not m:
-        return None
-    out = {}
-    for arm in re.finditer(r"(\d+)\s*=>\s*Error::([A-Za-z_][A-Za-z0-9_]*)", m.group(1)):
-        out[int(arm.group(1))] = arm.group(2)
-    return out
+ERRNO_SIDES = (
+    (KERNEL_ERROR, ("to_errno",)),
+    (LIBSYS_ERROR, ("to_errno", "from_errno")),
+)
 
 
 def check_error_codes():
-    k = parse_to_errno(KERNEL_ERROR)
-    l = parse_to_errno(LIBSYS_ERROR)
-    if not k or not l:
-        print("  FAIL 解析 to_errno 失败（kernel=%s libsys=%s）" % (bool(k), bool(l)))
-        return False
     ok = True
-    print("[abi-mirror] 错误码：kernel %d 项 / libsys %d 项" % (len(k), len(l)))
-    for name in sorted(set(k) & set(l)):
-        if k[name] != l[name]:
-            print("  FAIL %s：kernel=%d libsys=%d" % (name, k[name], l[name]))
-            ok = False
-    for name in sorted(set(k) ^ set(l)):
-        print("  FAIL 单侧存在的错误变体：%s" % name)
-        ok = False
-    frm = parse_from_errno(LIBSYS_ERROR)
-    if frm:
-        for name, num in l.items():
-            if frm.get(num) != name:
-                print("  FAIL libsys from_errno 不是 to_errno 的逆：%s=%d 反查得 %s" % (name, num, frm.get(num)))
+    print("[abi-mirror] 错误码：单一事实源 %s" % ABI_JSON)
+    for rel, fns in ERRNO_SIDES:
+        txt = read(rel)
+        for fn in fns:
+            body = re.search(r"fn " + fn + r"\([^)]*\)[^{]*\{(.*?)\n    \}", txt, re.S)
+            if body is None:
+                print("  FAIL %s：找不到 %s" % (rel, fn))
                 ok = False
+                continue
+            if "crate::abi_generated::" + fn not in body.group(1):
+                print("  FAIL %s：%s 未委托 crate::abi_generated::%s" % (rel, fn, fn))
+                ok = False
+        arms = re.findall(r"Error::[A-Za-z_][A-Za-z0-9_]*\s*=>\s*-?\d+\s*,", txt)
+        if arms:
+            print("  FAIL %s：残留 %d 条裸映射臂 %s" % (rel, len(arms), arms[:3]))
+            ok = False
+    if ok:
+        print("  OK   kernel/libsys 的 errno 映射全部委托生成物，无裸映射臂")
     return ok
 
 
