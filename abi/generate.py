@@ -206,6 +206,76 @@ def render_libsys_errno(doc):
     return "".join(out)
 
 
+LIBC_INCLUDE = os.path.join(ROOT, "libc", "include")
+
+
+def fmt_num(v, fmt, lang):
+    """按原书写形态渲染整数：C 的八进制是 `0NNN`，Rust 是 `0oNNN`（其余同形）。"""
+    if fmt == "hex":
+        return "0x%X" % v
+    if fmt == "oct":
+        return ("0o%o" if lang == "rust" else "0%o") % v
+    return str(v)
+
+
+def render_c_const(e):
+    if "c" in e:
+        return e["c"]
+    if "expr" in e:
+        return e["expr"]
+    return fmt_num(e["v"], e["fmt"], "c")
+
+
+def render_rust_const(e):
+    if "rust" in e:
+        return e["rust"]
+    if "expr" in e:
+        return e["expr"]
+    return fmt_num(e["v"], e["fmt"], "rust")
+
+
+def libc_type_imports(doc):
+    """libc 生成物需要的 ctypes 导入——**按 c_consts 实际用到的类型算**，不写死。
+
+    写死会随新增常量失效（本轮实测：clock_t / c_uchar / mode_t 三个类型漏了，
+    编译直接报 cannot find type）。
+    """
+    skip = {"usize", "u32", "u64", "i32", "i64", "isize", "mut", "const"}
+    # clock_t 不在 ctypes 里（它在 crate::time）——实测漏了它编译直接报 unresolved import。
+    elsewhere = {"clock_t": "crate::time"}
+    types = {"c_int", "c_long"}
+    extra = {}
+    for e in doc["c_consts"].values():
+        for m in re.finditer(r"\b([a-z_][a-z0-9_]*)\b", e["ty"]):
+            n = m.group(1)
+            if n in skip:
+                continue
+            if n in elsewhere:
+                extra.setdefault(elsewhere[n], set()).add(n)
+            else:
+                types.add(n)
+    out = "use crate::ctypes::{%s};\n" % ", ".join(sorted(types))
+    for mod, ns in sorted(extra.items()):
+        out += "use %s::{%s};\n" % (mod, ", ".join(sorted(ns)))
+    return out
+
+
+def render_libc_c_consts(doc):
+    """C 头 <-> Rust 常量（errno 之外）——两侧同一事实源。
+
+    三种形态，逐条如实：
+      · `v` + `fmt`  纯字面量（保留原书写形态：十进制 / 十六进制 / 八进制）；
+      · `expr`             语言中立的表达式（如 `1 << 4`、别名 `FNM_PATHNAME`）——
+                                 **不**把它折成裸数字，那会丢掉"第几位"与别名意图；
+      · `c` + `rust`     两种语言的形态**本就不同**（指针/函数指针强制转换、
+                                `i32::MAX`）——JSON 里同时记两种形态，一处改两处生效。
+    """
+    out = ["\n// ---------- C 头 <-> Rust 常量（errno 之外） ----------\n\n"]
+    for name, e in doc["c_consts"].items():
+        out.append("pub const %s: %s = %s;\n" % (name, e["ty"], render_rust_const(e)))
+    return "".join(out)
+
+
 def render_libc_errno(doc):
     """libc 的 134 个 errno 常量（C 头与 Rust 两侧同一事实源）。
 
@@ -258,6 +328,67 @@ def sync_defines(path, table):
     return txt, bad
 
 
+def eval_c_text(s):
+    """尽力求值一个 C 整型字面量/表达式；求不出返回 None（指针/强制转换形态）。"""
+    s = s.strip()
+    while s.startswith("(") and s.endswith(")"):
+        s = s[1:-1].strip()
+    if re.fullmatch(r"0[xX][0-9A-Fa-f]+[uUlL]*", s):
+        return int(re.sub(r"[uUlL]+$", "", s), 16)
+    if re.fullmatch(r"0[0-7]+[uUlL]*", s) and len(s) > 1:
+        return int(re.sub(r"[uUlL]+$", "", s), 8)
+    if re.fullmatch(r"-?\d+[uUlL]*", s):
+        return int(re.sub(r"[uUlL]+$", "", s))
+    if "<<" in s and re.fullmatch(r"[\d\s()<>|&+*\-x]+", s):
+        try:
+            return eval(s, {"__builtins__": {}}, {})
+        except Exception:
+            return None
+    return None
+
+
+def sync_c_consts(doc, write):
+    """把 libc 各头文件里 #define NAME <值> 的**值**同步成 c_consts 渲染出的形态。
+
+    只动值（连同它前后的空白），**保留尾随注释**——头文件是公开的、有注释的 C ABI 面。
+    同名多处定义（如 SEEK_SET 在 stdio.h 与 unistd.h 各一次）全部同步。
+    """
+    table = doc["c_consts"]
+    bad = []
+    for dp, dn, fns in os.walk(LIBC_INCLUDE):
+        for fn in sorted(fns):
+            if not fn.endswith(".h"):
+                continue
+            path = os.path.join(dp, fn)
+            lines = open(path, encoding="utf-8", newline="").read().split("\n")
+            changed = False
+            for i, line in enumerate(lines):
+                m = re.match(r"(\s*#\s*define\s+)([A-Za-z_][A-Za-z0-9_]*)(\s+)(.*)$", line)
+                if not m:
+                    continue
+                name = m.group(2)
+                if name not in table:
+                    continue
+                rest = m.group(4)
+                j = rest.find("/*")
+                val = (rest[:j] if j >= 0 else rest).strip()
+                want = render_c_const(table[name])
+                # **值相等就不动**：头文件里的 0040000 与渲染出的 040000 是同一个值，
+                # 强行"规范化"只是给公开头文件制造无意义 diff（本仓的 S_IF* 就属这类）。
+                if val != want:
+                    cv, wv = eval_c_text(val), eval_c_text(want)
+                    if cv is not None and cv == wv:
+                        continue
+                    bad.append((os.path.relpath(path, ROOT), name, val, want))
+                    if write:
+                        tail = rest[rest.find(val) + len(val):] if j >= 0 else ""
+                        lines[i] = m.group(1) + name + m.group(3) + want + tail
+                        changed = True
+            if write and changed:
+                open(path, "w", encoding="utf-8", newline="").write("\n".join(lines))
+    return bad
+
+
 GEN_FILES = (
     ("kernel:kernel", K_SYSCALL_GEN,
      lambda doc: render_syscalls(doc, "crate::syscall::domain", "crate::syscall::op")
@@ -270,8 +401,8 @@ GEN_FILES = (
      + render_libsys_errno(doc) + render_values(doc, LIBSYS_VALUES)
      + render_libsys_paths(doc) + render_libsys_tokens(doc)),
     ("libc", LIBC_GEN, lambda doc: HEADER.replace("@SRC@", SRC_REL)
-     + "use crate::ctypes::{c_int, c_long};\n" + render_values(doc, LIBC_VALUES)
-     + render_libc_tokens(doc) + render_libc_errno(doc)),
+     + libc_type_imports(doc) + render_values(doc, LIBC_VALUES)
+     + render_libc_tokens(doc) + render_libc_errno(doc) + render_libc_c_consts(doc)),
     ("tools:generated.py", TOOLS_GEN, render_python_tokens),
     ("shell:abi", SHELL_GEN, render_shell_tokens),
 )
@@ -385,6 +516,36 @@ def main():
             for name, cur, want in bad:
                 print("[abi-gen] FAIL %s：%s 实为 %s，应为 %s" % (label, name, cur, want))
                 ok = False
+
+    # 手写 libc 源里**不得**再定义已生成的常量（生成物自身与测试模块除外）。
+    # 与 abi_mirrors_agree 第 3 类的"泄漏"检查同一判据——两个工具必须结论一致
+    # （第八阶段踩过：两个工具清单不一致时，只跑一个会得出"没问题"）。
+    generated = set(doc["errno_table"]) | set(doc["c_consts"])
+    for dp, dn, fns in os.walk(os.path.join(ROOT, "libc", "src")):
+        for fn in sorted(fns):
+            if not fn.endswith(".rs") or fn == "abi_generated.rs":
+                continue
+            path = os.path.join(dp, fn)
+            txt = open(path, encoding="utf-8").read()
+            for m in re.finditer(r"(?:pub\s+)?const ([A-Za-z_][A-Za-z0-9_]*)\s*:", txt):
+                if m.group(1) not in generated:
+                    continue
+                pre = txt[:m.start()]
+                if pre.rfind("#[cfg(test)]") > pre.rfind("\n}"):
+                    continue
+                print("[abi-gen] FAIL %s 里仍在定义已生成的常量 %s（应改为 use crate::abi_generated::%s）"
+                      % (os.path.relpath(path, ROOT), m.group(1), m.group(1)))
+                ok = False
+
+    # C 头里 c_consts 的值
+    bad = sync_c_consts(doc, a.write)
+    if a.write:
+        if bad:
+            print("[abi-gen] libc 头文件：同步 %d 处 #define 值" % len(bad))
+    else:
+        for rel, name, cur, want in bad:
+            print("[abi-gen] FAIL %s：%s 实为 %r，应为 %r" % (rel, name, cur, want))
+            ok = False
 
     if a.write:
         return 0

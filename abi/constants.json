@@ -545,5 +545,713 @@
     "EWOULDBLOCK": 11,
     "EXDEV": 18,
     "EXFULL": 54
+  },
+  "c_consts": {
+    "BUFSIZ": {
+      "ty": "usize",
+      "v": 8192,
+      "fmt": "dec"
+    },
+    "CLOCKS_PER_SEC": {
+      "ty": "clock_t",
+      "v": 1000000000,
+      "fmt": "dec"
+    },
+    "CLOCK_MONOTONIC": {
+      "ty": "c_int",
+      "v": 1,
+      "fmt": "dec"
+    },
+    "CLOCK_REALTIME": {
+      "ty": "c_int",
+      "v": 0,
+      "fmt": "dec"
+    },
+    "DT_DIR": {
+      "ty": "c_uchar",
+      "v": 4,
+      "fmt": "dec"
+    },
+    "DT_REG": {
+      "ty": "c_uchar",
+      "v": 8,
+      "fmt": "dec"
+    },
+    "DT_UNKNOWN": {
+      "ty": "c_uchar",
+      "v": 0,
+      "fmt": "dec"
+    },
+    "EOF": {
+      "ty": "c_int",
+      "v": -1,
+      "fmt": "dec"
+    },
+    "FD_CLOEXEC": {
+      "ty": "c_int",
+      "v": 1,
+      "fmt": "dec"
+    },
+    "FNM_CASEFOLD": {
+      "ty": "c_int",
+      "expr": "(1 << 4)"
+    },
+    "FNM_FILE_NAME": {
+      "ty": "c_int",
+      "expr": "FNM_PATHNAME"
+    },
+    "FNM_LEADING_DIR": {
+      "ty": "c_int",
+      "expr": "(1 << 3)"
+    },
+    "FNM_NOESCAPE": {
+      "ty": "c_int",
+      "expr": "(1 << 1)"
+    },
+    "FNM_NOMATCH": {
+      "ty": "c_int",
+      "v": 1,
+      "fmt": "dec"
+    },
+    "FNM_PATHNAME": {
+      "ty": "c_int",
+      "expr": "(1 << 0)"
+    },
+    "FNM_PERIOD": {
+      "ty": "c_int",
+      "expr": "(1 << 2)"
+    },
+    "FP_INFINITE": {
+      "ty": "c_int",
+      "v": 1,
+      "fmt": "dec"
+    },
+    "FP_NAN": {
+      "ty": "c_int",
+      "v": 0,
+      "fmt": "dec"
+    },
+    "FP_NORMAL": {
+      "ty": "c_int",
+      "v": 4,
+      "fmt": "dec"
+    },
+    "FP_SUBNORMAL": {
+      "ty": "c_int",
+      "v": 3,
+      "fmt": "dec"
+    },
+    "FP_ZERO": {
+      "ty": "c_int",
+      "v": 2,
+      "fmt": "dec"
+    },
+    "F_DUPFD": {
+      "ty": "c_int",
+      "v": 0,
+      "fmt": "dec"
+    },
+    "F_GETFD": {
+      "ty": "c_int",
+      "v": 1,
+      "fmt": "dec"
+    },
+    "F_GETFL": {
+      "ty": "c_int",
+      "v": 3,
+      "fmt": "dec"
+    },
+    "F_SETFD": {
+      "ty": "c_int",
+      "v": 2,
+      "fmt": "dec"
+    },
+    "F_SETFL": {
+      "ty": "c_int",
+      "v": 4,
+      "fmt": "dec"
+    },
+    "GLOB_ABORTED": {
+      "ty": "c_int",
+      "v": 2,
+      "fmt": "dec"
+    },
+    "GLOB_APPEND": {
+      "ty": "c_int",
+      "expr": "(1 << 5)"
+    },
+    "GLOB_DOOFFS": {
+      "ty": "c_int",
+      "expr": "(1 << 3)"
+    },
+    "GLOB_ERR": {
+      "ty": "c_int",
+      "expr": "(1 << 0)"
+    },
+    "GLOB_MARK": {
+      "ty": "c_int",
+      "expr": "(1 << 1)"
+    },
+    "GLOB_NOCHECK": {
+      "ty": "c_int",
+      "expr": "(1 << 4)"
+    },
+    "GLOB_NOESCAPE": {
+      "ty": "c_int",
+      "expr": "(1 << 6)"
+    },
+    "GLOB_NOMATCH": {
+      "ty": "c_int",
+      "v": 3,
+      "fmt": "dec"
+    },
+    "GLOB_NOSORT": {
+      "ty": "c_int",
+      "expr": "(1 << 2)"
+    },
+    "GLOB_NOSPACE": {
+      "ty": "c_int",
+      "v": 1,
+      "fmt": "dec"
+    },
+    "GLOB_PERIOD": {
+      "ty": "c_int",
+      "expr": "(1 << 7)"
+    },
+    "LOCK_EX": {
+      "ty": "c_int",
+      "v": 2,
+      "fmt": "dec"
+    },
+    "LOCK_NB": {
+      "ty": "c_int",
+      "v": 4,
+      "fmt": "dec"
+    },
+    "LOCK_SH": {
+      "ty": "c_int",
+      "v": 1,
+      "fmt": "dec"
+    },
+    "LOCK_UN": {
+      "ty": "c_int",
+      "v": 8,
+      "fmt": "dec"
+    },
+    "MAP_ANONYMOUS": {
+      "ty": "c_int",
+      "v": 32,
+      "fmt": "hex"
+    },
+    "MAP_FAILED": {
+      "ty": "*mut c_void",
+      "c": "((void *)-1)",
+      "rust": "usize::MAX as *mut c_void"
+    },
+    "MAP_PRIVATE": {
+      "ty": "c_int",
+      "v": 2,
+      "fmt": "hex"
+    },
+    "MAP_SHARED": {
+      "ty": "c_int",
+      "v": 1,
+      "fmt": "hex"
+    },
+    "O_APPEND": {
+      "ty": "c_int",
+      "v": 1024,
+      "fmt": "hex"
+    },
+    "O_CLOEXEC": {
+      "ty": "c_int",
+      "v": 524288,
+      "fmt": "hex"
+    },
+    "O_CREAT": {
+      "ty": "c_int",
+      "v": 64,
+      "fmt": "hex"
+    },
+    "O_EXCL": {
+      "ty": "c_int",
+      "v": 128,
+      "fmt": "hex"
+    },
+    "O_RDONLY": {
+      "ty": "c_int",
+      "v": 0,
+      "fmt": "dec"
+    },
+    "O_RDWR": {
+      "ty": "c_int",
+      "v": 2,
+      "fmt": "dec"
+    },
+    "O_TRUNC": {
+      "ty": "c_int",
+      "v": 512,
+      "fmt": "hex"
+    },
+    "O_WRONLY": {
+      "ty": "c_int",
+      "v": 1,
+      "fmt": "dec"
+    },
+    "POSIX_SPAWN_RESETIDS": {
+      "ty": "c_int",
+      "v": 1,
+      "fmt": "hex"
+    },
+    "POSIX_SPAWN_SETPGROUP": {
+      "ty": "c_int",
+      "v": 2,
+      "fmt": "hex"
+    },
+    "POSIX_SPAWN_SETSCHEDPARAM": {
+      "ty": "c_int",
+      "v": 16,
+      "fmt": "hex"
+    },
+    "POSIX_SPAWN_SETSCHEDULER": {
+      "ty": "c_int",
+      "v": 32,
+      "fmt": "hex"
+    },
+    "POSIX_SPAWN_SETSIGDEF": {
+      "ty": "c_int",
+      "v": 4,
+      "fmt": "hex"
+    },
+    "POSIX_SPAWN_SETSIGMASK": {
+      "ty": "c_int",
+      "v": 8,
+      "fmt": "hex"
+    },
+    "PRIO_PGRP": {
+      "ty": "c_int",
+      "v": 1,
+      "fmt": "dec"
+    },
+    "PRIO_PROCESS": {
+      "ty": "c_int",
+      "v": 0,
+      "fmt": "dec"
+    },
+    "PRIO_USER": {
+      "ty": "c_int",
+      "v": 2,
+      "fmt": "dec"
+    },
+    "PROT_EXEC": {
+      "ty": "c_int",
+      "v": 4,
+      "fmt": "dec"
+    },
+    "PROT_READ": {
+      "ty": "c_int",
+      "v": 1,
+      "fmt": "dec"
+    },
+    "PROT_WRITE": {
+      "ty": "c_int",
+      "v": 2,
+      "fmt": "dec"
+    },
+    "RAND_MAX": {
+      "ty": "c_int",
+      "c": "0x7FFFFFFF",
+      "rust": "i32::MAX"
+    },
+    "REG_BADBR": {
+      "ty": "c_int",
+      "v": 10,
+      "fmt": "dec"
+    },
+    "REG_BADPAT": {
+      "ty": "c_int",
+      "v": 2,
+      "fmt": "dec"
+    },
+    "REG_BADRPT": {
+      "ty": "c_int",
+      "v": 13,
+      "fmt": "dec"
+    },
+    "REG_EBRACE": {
+      "ty": "c_int",
+      "v": 9,
+      "fmt": "dec"
+    },
+    "REG_EBRACK": {
+      "ty": "c_int",
+      "v": 7,
+      "fmt": "dec"
+    },
+    "REG_ECOLLATE": {
+      "ty": "c_int",
+      "v": 3,
+      "fmt": "dec"
+    },
+    "REG_ECTYPE": {
+      "ty": "c_int",
+      "v": 4,
+      "fmt": "dec"
+    },
+    "REG_EESCAPE": {
+      "ty": "c_int",
+      "v": 5,
+      "fmt": "dec"
+    },
+    "REG_EPAREN": {
+      "ty": "c_int",
+      "v": 8,
+      "fmt": "dec"
+    },
+    "REG_ERANGE": {
+      "ty": "c_int",
+      "v": 11,
+      "fmt": "dec"
+    },
+    "REG_ESPACE": {
+      "ty": "c_int",
+      "v": 12,
+      "fmt": "dec"
+    },
+    "REG_ESUBREG": {
+      "ty": "c_int",
+      "v": 6,
+      "fmt": "dec"
+    },
+    "REG_EXTENDED": {
+      "ty": "c_int",
+      "v": 1,
+      "fmt": "dec"
+    },
+    "REG_ICASE": {
+      "ty": "c_int",
+      "v": 2,
+      "fmt": "dec"
+    },
+    "REG_NEWLINE": {
+      "ty": "c_int",
+      "v": 4,
+      "fmt": "dec"
+    },
+    "REG_NOMATCH": {
+      "ty": "c_int",
+      "v": 1,
+      "fmt": "dec"
+    },
+    "REG_NOSUB": {
+      "ty": "c_int",
+      "v": 8,
+      "fmt": "dec"
+    },
+    "REG_NOTBOL": {
+      "ty": "c_int",
+      "v": 1,
+      "fmt": "dec"
+    },
+    "REG_NOTEOL": {
+      "ty": "c_int",
+      "v": 2,
+      "fmt": "dec"
+    },
+    "SA_ONSTACK": {
+      "ty": "c_int",
+      "v": 134217728,
+      "fmt": "hex"
+    },
+    "SEEK_CUR": {
+      "ty": "c_int",
+      "v": 1,
+      "fmt": "dec"
+    },
+    "SEEK_END": {
+      "ty": "c_int",
+      "v": 2,
+      "fmt": "dec"
+    },
+    "SEEK_SET": {
+      "ty": "c_int",
+      "v": 0,
+      "fmt": "dec"
+    },
+    "SIGALRM": {
+      "ty": "c_int",
+      "v": 14,
+      "fmt": "dec"
+    },
+    "SIGBUS": {
+      "ty": "c_int",
+      "v": 7,
+      "fmt": "dec"
+    },
+    "SIGCHLD": {
+      "ty": "c_int",
+      "v": 17,
+      "fmt": "dec"
+    },
+    "SIGCONT": {
+      "ty": "c_int",
+      "v": 18,
+      "fmt": "dec"
+    },
+    "SIGFPE": {
+      "ty": "c_int",
+      "v": 8,
+      "fmt": "dec"
+    },
+    "SIGILL": {
+      "ty": "c_int",
+      "v": 4,
+      "fmt": "dec"
+    },
+    "SIGINT": {
+      "ty": "c_int",
+      "v": 2,
+      "fmt": "dec"
+    },
+    "SIGKILL": {
+      "ty": "c_int",
+      "v": 9,
+      "fmt": "dec"
+    },
+    "SIGPIPE": {
+      "ty": "c_int",
+      "v": 13,
+      "fmt": "dec"
+    },
+    "SIGSEGV": {
+      "ty": "c_int",
+      "v": 11,
+      "fmt": "dec"
+    },
+    "SIGSTOP": {
+      "ty": "c_int",
+      "v": 19,
+      "fmt": "dec"
+    },
+    "SIGTERM": {
+      "ty": "c_int",
+      "v": 15,
+      "fmt": "dec"
+    },
+    "SIGUSR1": {
+      "ty": "c_int",
+      "v": 10,
+      "fmt": "dec"
+    },
+    "SIGUSR2": {
+      "ty": "c_int",
+      "v": 12,
+      "fmt": "dec"
+    },
+    "SIG_DFL": {
+      "ty": "usize",
+      "c": "((sighandler_t)0)",
+      "rust": "0"
+    },
+    "SIG_ERR": {
+      "ty": "usize",
+      "c": "((sighandler_t)-1)",
+      "rust": "usize::MAX"
+    },
+    "SIG_IGN": {
+      "ty": "usize",
+      "c": "((sighandler_t)1)",
+      "rust": "1"
+    },
+    "SS_DISABLE": {
+      "ty": "c_int",
+      "v": 2,
+      "fmt": "dec"
+    },
+    "SS_ONSTACK": {
+      "ty": "c_int",
+      "v": 1,
+      "fmt": "dec"
+    },
+    "S_IFBLK": {
+      "ty": "u32",
+      "v": 24576,
+      "fmt": "oct"
+    },
+    "S_IFCHR": {
+      "ty": "u32",
+      "v": 8192,
+      "fmt": "oct"
+    },
+    "S_IFDIR": {
+      "ty": "u32",
+      "v": 16384,
+      "fmt": "oct"
+    },
+    "S_IFIFO": {
+      "ty": "u32",
+      "v": 4096,
+      "fmt": "oct"
+    },
+    "S_IFLNK": {
+      "ty": "u32",
+      "v": 40960,
+      "fmt": "oct"
+    },
+    "S_IFMT": {
+      "ty": "u32",
+      "v": 61440,
+      "fmt": "oct"
+    },
+    "S_IFREG": {
+      "ty": "u32",
+      "v": 32768,
+      "fmt": "oct"
+    },
+    "S_IFSOCK": {
+      "ty": "u32",
+      "v": 49152,
+      "fmt": "oct"
+    },
+    "S_IRUSR": {
+      "ty": "mode_t",
+      "v": 256,
+      "fmt": "oct"
+    },
+    "S_IWUSR": {
+      "ty": "mode_t",
+      "v": 128,
+      "fmt": "oct"
+    },
+    "S_IXUSR": {
+      "ty": "mode_t",
+      "v": 64,
+      "fmt": "oct"
+    },
+    "WNOHANG": {
+      "ty": "c_int",
+      "v": 1,
+      "fmt": "dec"
+    },
+    "WRDE_APPEND": {
+      "ty": "c_int",
+      "v": 1,
+      "fmt": "dec"
+    },
+    "WRDE_BADCHAR": {
+      "ty": "c_int",
+      "v": 1,
+      "fmt": "dec"
+    },
+    "WRDE_BADVAL": {
+      "ty": "c_int",
+      "v": 2,
+      "fmt": "dec"
+    },
+    "WRDE_CMDSUB": {
+      "ty": "c_int",
+      "v": 3,
+      "fmt": "dec"
+    },
+    "WRDE_DOOFFS": {
+      "ty": "c_int",
+      "v": 2,
+      "fmt": "dec"
+    },
+    "WRDE_NOCMD": {
+      "ty": "c_int",
+      "v": 4,
+      "fmt": "dec"
+    },
+    "WRDE_NOSPACE": {
+      "ty": "c_int",
+      "v": 4,
+      "fmt": "dec"
+    },
+    "WRDE_REUSE": {
+      "ty": "c_int",
+      "v": 8,
+      "fmt": "dec"
+    },
+    "WRDE_SHOWERR": {
+      "ty": "c_int",
+      "v": 16,
+      "fmt": "dec"
+    },
+    "WRDE_SYNTAX": {
+      "ty": "c_int",
+      "v": 6,
+      "fmt": "dec"
+    },
+    "WRDE_UNDEF": {
+      "ty": "c_int",
+      "v": 32,
+      "fmt": "dec"
+    },
+    "_IOFBF": {
+      "ty": "c_int",
+      "v": 0,
+      "fmt": "dec"
+    },
+    "_IOLBF": {
+      "ty": "c_int",
+      "v": 1,
+      "fmt": "dec"
+    },
+    "_IONBF": {
+      "ty": "c_int",
+      "v": 2,
+      "fmt": "dec"
+    },
+    "_PC_LINK_MAX": {
+      "ty": "c_int",
+      "v": 0,
+      "fmt": "dec"
+    },
+    "_PC_MAX_CANON": {
+      "ty": "c_int",
+      "v": 1,
+      "fmt": "dec"
+    },
+    "_PC_MAX_INPUT": {
+      "ty": "c_int",
+      "v": 2,
+      "fmt": "dec"
+    },
+    "_PC_NAME_MAX": {
+      "ty": "c_int",
+      "v": 3,
+      "fmt": "dec"
+    },
+    "_PC_PATH_MAX": {
+      "ty": "c_int",
+      "v": 4,
+      "fmt": "dec"
+    },
+    "_PC_PIPE_BUF": {
+      "ty": "c_int",
+      "v": 5,
+      "fmt": "dec"
+    },
+    "_SC_NPROCESSORS_ONLN": {
+      "ty": "c_int",
+      "v": 84,
+      "fmt": "dec"
+    },
+    "no_argument": {
+      "ty": "c_int",
+      "v": 0,
+      "fmt": "dec"
+    },
+    "optional_argument": {
+      "ty": "c_int",
+      "v": 2,
+      "fmt": "dec"
+    },
+    "required_argument": {
+      "ty": "c_int",
+      "v": 1,
+      "fmt": "dec"
+    }
   }
 }

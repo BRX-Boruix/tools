@@ -197,61 +197,89 @@ def check_error_codes():
 
 
 # ---------- 3. C 头 <-> Rust 常量 ----------
+#
+# **2026-10-14 起全部改为生成**。这一族共 279 项（libc 的 C 头 #define 与 Rust 常量同名），
+# 此前是"两侧各手写一份 + 本类比对"。现在：
+#   · 134 项 errno  -> tools/abi/constants.json 的 errno_table；
+#   · 144 项其它常量 -> 同文件的 c_consts；
+#   · **1 项 NULL 仍手写**——它是**条件定义**（`#ifdef __cplusplus` 两个分支值不同），
+#     单一值表达不了。如实保留并在此说明。
+#
+# 本类的职责因此变成两件：
+#   1. **内容核对**：C 头里的值与生成物里的值必须一致（防头文件被改而不重新生成）；
+#   2. **接线核对**：手写 libc 源里**不得**再定义这些常量（只能 use 生成物），
+#      并**显式报数**（名字从一侧消失会让交集变小、类仍然"通过"——那是静默流失）。
+
+GENERATED_STILL_HANDWRITTEN = {
+    "NULL": "条件定义（#ifdef __cplusplus 两分支值不同），单一值表达不了",
+}
+
+
+def _libc_const_defs(exclude_generated):
+    out = {}
+    for p in walk(os.path.join("libc", "src"), ".rs"):
+        rel = os.path.relpath(p, ROOT)
+        if exclude_generated and rel.endswith("abi_generated.rs"):
+            continue
+        txt = open(p, encoding="utf-8").read()
+        for m in re.finditer(r"(?:pub\s+)?const ([A-Za-z_][A-Za-z0-9_]*)\s*:\s*[^=;]+?=\s*([^;]+);", txt):
+            pre = txt[:m.start()]
+            if pre.rfind("#[cfg(test)]") > pre.rfind("\n}"):
+                continue  # 测试模块里的同名常量不算（如 ctype.rs 的局部 EOF）
+            out.setdefault(m.group(1), []).append((m.group(2).strip(), rel, pre.count("\n") + 1))
+    return out
+
 
 def check_header_consts():
+    import json as _json
+    with open(os.path.join(ROOT, ABI_JSON), encoding="utf-8") as fh:
+        _doc = _json.load(fh)
+    errno_tbl, c_consts = _doc["errno_table"], _doc["c_consts"]
+    generated = set(errno_tbl) | set(c_consts)
+
     hdr = {}
     for p in walk(os.path.join("libc", "include"), ".h"):
         for i, line in enumerate(open(p, encoding="utf-8").read().splitlines(), 1):
             m = re.match(r"\s*#\s*define\s+([A-Za-z_][A-Za-z0-9_]*)\s+(.+?)\s*$", line)
             if m:
                 hdr.setdefault(m.group(1), []).append((m.group(2).strip(), os.path.relpath(p, ROOT), i))
-    rs = {}
-    for p in walk(os.path.join("libc", "src"), ".rs"):
-        txt = open(p, encoding="utf-8").read()
-        # **pub 与非 pub 都扫**：同名私有常量同样是"与头文件必须一致"的镜像，
-        # 只扫 pub 会让这一类（实测 FP_*/BUFSIZ 共 6 个）完全逃过核对。
-        for m in re.finditer(r"(?:pub\s+)?const ([A-Za-z_][A-Za-z0-9_]*)\s*:\s*[^=;]+?=\s*([^;]+);", txt):
-            rs.setdefault(m.group(1), []).append((m.group(2).strip(), os.path.relpath(p, ROOT), txt[:m.start()].count("\n") + 1))
-    # **已生成的一族**：134 个 errno 常量现在由 tools/abi/constants.json 的 errno_table
-    # 同时产出（errno.h 的 #define 行 + libc/src/abi_generated.rs 的常量）。它们不再参与
-    # 本类的"两份手写比对"，但**必须显式报数**——否则覆盖会静默流失（本仓踩过这个坑：
-    # 名字从一侧消失时交集变小，类仍然"通过"）。
-    import json as _json
-    with open(os.path.join(ROOT, ABI_JSON), encoding="utf-8") as fh:
-        _errno_tbl = _json.load(fh)["errno_table"]
-    for _n in _errno_tbl:
-        hdr.pop(_n, None)
-        rs.pop(_n, None)
-    errno_rs = read("libc/src/errno.rs")
-    wired = len(re.findall(r"pub use crate::abi_generated::E[A-Z0-9_]+;", errno_rs))
-    if wired != len(_errno_tbl):
-        print("  FAIL libc/src/errno.rs：只有 %d 项引用生成物，errno_table 有 %d 项"
-              % (wired, len(_errno_tbl)))
-        return False
-    print("[abi-mirror] errno：%d 项**已生成**（errno.h 的 #define 行 + abi_generated.rs），"
-          "不参与下面的两份手写比对" % len(_errno_tbl))
+    all_defs = _libc_const_defs(exclude_generated=False)
+    gen_defs = {k: v for k, v in all_defs.items()
+                if any(r.endswith("abi_generated.rs") for _, r, _ in v)}
+    hand_defs = _libc_const_defs(exclude_generated=True)
+
+    ok = True
+    missing = sorted(generated - set(gen_defs))
+    if missing:
+        print("  FAIL 生成物里缺少 %d 项：%s" % (len(missing), missing[:6]))
+        ok = False
+    leaked = sorted(n for n in generated if n in hand_defs)
+    if leaked:
+        print("  FAIL 手写 libc 源里仍在定义已生成的常量 %d 项：%s" % (len(leaked), leaked[:6]))
+        ok = False
+    print("[abi-mirror] C 头 <-> Rust 常量：**已生成 %d 项**（errno %d + 其它 %d），仍手写 %d 项 %s"
+          % (len(generated), len(errno_tbl), len(c_consts),
+             len(GENERATED_STILL_HANDWRITTEN), list(GENERATED_STILL_HANDWRITTEN)))
 
     compared, bad, skipped = 0, [], []
-    for name in sorted(set(hdr) & set(rs)):
+    for name in sorted(set(hdr) & set(gen_defs)):
         hv = {eval_int(v) for v, _, _ in hdr[name]} - {None}
-        rv = {eval_int(v) for v, _, _ in rs[name]} - {None}
+        rv = {eval_int(v) for v, _, _ in gen_defs[name]} - {None}
         if not hv or not rv:
             skipped.append(name)
             continue
         compared += 1
-        # 指针值常量两侧写法不同（C 的 ((T)-1) 与 Rust 的 usize::MAX）：按 64 位位型比较。
         MASK = (1 << 64) - 1
         if not ({v & MASK for v in hv} & {v & MASK for v in rv}):
-            bad.append((name, hdr[name], rs[name]))
-    print("[abi-mirror] C 头 <-> Rust 常量（errno 之外）：同名 %d 项，可比 %d 项，跳过（含符号名）%d 项"
-          % (len(set(hdr) & set(rs)), compared, len(skipped)))
+            bad.append((name, hdr[name], gen_defs[name]))
+    print("  C 头 <-> 生成物：可比 %d 项，跳过（含符号名/表达式）%d 项" % (compared, len(skipped)))
     for name, h, r in bad:
         print("  FAIL %s" % name)
         for v, p, i in h:
             print("        H %-30s %s:%d" % (v[:30], p, i))
         for v, p, i in r:
             print("        R %-30s %s:%d" % (v[:30], p, i))
-    return not bad
+    return ok and not bad
 
 
 # ---------- 4. 系统路径 ----------
