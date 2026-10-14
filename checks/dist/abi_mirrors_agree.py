@@ -239,6 +239,13 @@ PATH_CONTRACTS = (
         ("kernel/crates/vfs/src/devfs.rs", r'root\.add_child\("(consoles)"'),
         ("libsys/src/event.rs", r'CONSOLES_DIR_PREFIX: &str = "(/devices/consoles/)"'),
     )),
+    # 2026-10-14 补：**单数**的兼容别名 `/devices/console`（实例 0）此前是**无门禁的镜像**——
+    # 内核 devfs 逐段拼 add_child("console")，libsys 写整串 CONSOLE_PATH。按本仓的规则
+    # 「没有门禁的镜像注释，等于没有」，这一对必须进契约。
+    ("console 兼容别名（实例 0）", (
+        ("kernel/crates/vfs/src/devfs.rs", r'root\.add_child\("(console)"'),
+        ("libsys/src/event.rs", r'CONSOLE_PATH: &str = "(/devices/console)"'),
+    )),
     # 2026-10-14：**用户态收成一处**。init/login 原本各写一份字面量（PREFIX / format!），
     # 现都从 libsys::CONSOLES_DIR_PREFIX 派生 ⇒ 上面那条契约只剩「内核建目录」与
     # 「用户态前缀」两个站点。这一条钉住两个引用方**必须**继续引用该常量——
