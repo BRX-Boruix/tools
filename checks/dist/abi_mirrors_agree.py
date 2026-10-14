@@ -235,65 +235,47 @@ def check_header_consts():
     return not bad
 
 
-# ---------- 4. 路径契约 ----------
+# ---------- 4. 系统路径 ----------
+#
+# **2026-10-14 起改为「生成 + 接线检查」**（与 1/2/5 类同一改法）。完整路径的唯一事实源
+# 是 tools/abi/constants.json 的 paths 节：用户态取整串，内核 devfs 取**末段**
+# （段名是完整路径的派生量，写第二遍就多一个可漂移处）。故本类改查**接线**。
 
-# 每条 = (概念, [(文件, 抓出路径字面量的正则)])；所有抓出的字面量必须逐字节相同。
-PATH_CONTRACTS = (
-    ("console 实例节点目录", (
-        ("kernel/crates/vfs/src/devfs.rs", r'root\.add_child\("(consoles)"'),
-        ("libsys/src/event.rs", r'CONSOLES_DIR_PREFIX: &str = "(/devices/consoles/)"'),
-    )),
-    # 2026-10-14 补：**单数**的兼容别名 `/devices/console`（实例 0）此前是**无门禁的镜像**——
-    # 内核 devfs 逐段拼 add_child("console")，libsys 写整串 CONSOLE_PATH。按本仓的规则
-    # 「没有门禁的镜像注释，等于没有」，这一对必须进契约。
-    ("console 兼容别名（实例 0）", (
-        ("kernel/crates/vfs/src/devfs.rs", r'root\.add_child\("(console)"'),
-        ("libsys/src/event.rs", r'CONSOLE_PATH: &str = "(/devices/console)"'),
-    )),
-    # 2026-10-14：**用户态收成一处**。init/login 原本各写一份字面量（PREFIX / format!），
-    # 现都从 libsys::CONSOLES_DIR_PREFIX 派生 ⇒ 上面那条契约只剩「内核建目录」与
-    # 「用户态前缀」两个站点。这一条钉住两个引用方**必须**继续引用该常量——
-    # 否则有人改回字面量时，上面那条契约仍然"通过"（因为它只看两个站点）。
-    ("console 用户态前缀的引用方", (
-        ("init/src/main.rs", r'libsys::(CONSOLES_DIR_PREFIX)'),
-        ("login/src/main.rs", r'libsys::(CONSOLES_DIR_PREFIX)'),
-    )),
-    # 2026-10-13：init 里原本三处各写一遍（CONSOLE_REQUESTS_DIR / make_request_path 的
-    # PREFIX / drop_bad_name_request 的 DIRP），已收敛为一处常量、其余**派生**；本契约因此
-    # 只剩一个站点，另外由下面的「单点字面量」检查钉住"不许再出现第二份"。
-    ("console 请求目录", (
-        ("init/src/main.rs", r'CONSOLE_REQUESTS_DIR: &str = "(/system/console-requests)"'),
-    )),
+PATH_WIRING = (
+    ("console 实例节点目录（内核段名）", "kernel/crates/vfs/src/devfs.rs",
+     r"root\.add_child\(crate::abi_generated::CONSOLES_DIR_NAME, "),
+    ("console 兼容别名（内核段名）", "kernel/crates/vfs/src/devfs.rs",
+     r"root\.add_child\(crate::abi_generated::CONSOLE_NODE_NAME, "),
+    ("console 兼容别名（用户态整串）", "libsys/src/event.rs",
+     r"pub const CONSOLE_PATH: &str = crate::abi_generated::CONSOLE_PATH;"),
+    ("console 实例节点目录（用户态整串）", "libsys/src/event.rs",
+     r"pub const CONSOLES_DIR_PREFIX: &str = crate::abi_generated::CONSOLES_DIR_PREFIX;"),
+    # 引用方契约（保留）：init/login 必须继续引用 libsys 的前缀，不许改回字面量。
+    ("console 用户态前缀的引用方", "init/src/main.rs", r"libsys::CONSOLES_DIR_PREFIX"),
+    ("console 用户态前缀的引用方", "login/src/main.rs", r"libsys::CONSOLES_DIR_PREFIX"),
+)
+
+# 这些文件里**不得**再写死路径（测试里的硬编码不算——那是独立核对，故意不跟随生成物）。
+PATH_HARDCODED = (
+    ("kernel/crates/vfs/src/devfs.rs", r'root\.add_child\("(?:console|consoles)"'),
+    ("libsys/src/event.rs", r'pub const (?:CONSOLE_PATH|CONSOLES_DIR_PREFIX): &str = "'),
 )
 
 
 def check_path_contracts():
     ok = True
-    print("[abi-mirror] 路径契约：%d 条" % len(PATH_CONTRACTS))
-    for concept, sites in PATH_CONTRACTS:
-        found = []
-        for rel, pattern in sites:
-            txt = read(rel)
-            m = re.search(pattern, txt)
-            if not m:
-                print("  FAIL %s：在 %s 里解析不出路径（正则 %s）" % (concept, rel, pattern))
-                ok = False
-                continue
-            found.append((m.group(1), rel))
-        # 判据：各处的路径**段序列**必须互为后缀（内核按"目录名 + 子名"逐段拼，
-        # 用户态按整串拼，故合法形态本就长短不一；段序列一旦不是后缀关系即为漂移）。
-        def segs(s):
-            return [x for x in s.split("/") if x]
-        vals = [(segs(v), v, rel) for v, rel in found]
-        longest = max(vals, key=lambda t: len(t[0]))[0] if vals else []
-        drifted = [t for t in vals if longest[len(longest) - len(t[0]):] != t[0]] if vals else []
-        if drifted:
-            print("  FAIL %s：多处拼法不一致（段序列非后缀关系）" % concept)
-            for s, v, rel in vals:
-                print("        %-28s %s" % (v, rel))
+    print("[abi-mirror] 系统路径：单一事实源 %s，%d 个站点" % (ABI_JSON, len(PATH_WIRING)))
+    for concept, rel, pat in PATH_WIRING:
+        if not re.search(pat, read(rel)):
+            print("  FAIL %s：%s 里没有引用生成物（应匹配 %s）" % (concept, rel, pat))
             ok = False
-        elif found:
-            print("  OK   %s = %s（%d 处）" % (concept, found[0][1], len(found)))
+    for rel, pat in PATH_HARDCODED:
+        m = re.search(pat, read(rel))
+        if m:
+            print("  FAIL %s 里仍有写死的路径：%s" % (rel, m.group(0)))
+            ok = False
+    if ok:
+        print("  OK   %d 个站点全部引用生成物，且无写死路径" % len(PATH_WIRING))
     return ok
 
 
@@ -542,8 +524,10 @@ def check_token_contracts():
 # 只数**代码行**里的出现次数（以 // 开头的注释行不计）——注释里提一句不算第二份事实。
 SINGLE_LITERAL = (
     ("console 请求目录（init 内）", "init/src/main.rs", "/system/console-requests"),
-    # 用户态单一事实源已从 init 移到 libsys（init/login 改为派生）。
-    ("console 实例节点目录（用户态单一事实源）", "libsys/src/event.rs", "/devices/consoles/"),
+    # /devices/consoles/ 的「单点字面量」检查**已撤销**：它现在由 tools/abi/constants.json
+    # 生成（见第 4 类），字面量根本不该出现在手写文件里——那是 PATH_HARDCODED 的职责。
+    # /system/console-requests 保留：内核只在注释里提到它，**不是**跨边界契约，
+    # 它是 init 内部的单点，仍由本检查钉住"不许出现第二份"。
 )
 
 

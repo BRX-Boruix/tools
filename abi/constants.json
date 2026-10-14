@@ -423,5 +423,9 @@
     "FLOCK_CMD_SHARED": 0,
     "FLOCK_CMD_EXCLUSIVE": 1,
     "FLOCK_CMD_UNLOCK": 2
+  },
+  "paths": {
+    "CONSOLE_PATH": "/devices/console",
+    "CONSOLES_DIR_PREFIX": "/devices/consoles/"
   }
 }

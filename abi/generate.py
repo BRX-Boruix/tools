@@ -88,6 +88,27 @@ def render_values(doc, entries):
     return "".join(out)
 
 
+def render_libsys_paths(doc):
+    out = ["\n// ---------- 系统路径（与内核 devfs 同一事实源） ----------\n\n"]
+    for name in ("CONSOLE_PATH", "CONSOLES_DIR_PREFIX"):
+        out.append('pub const %s: &str = "%s";\n' % (name, doc["paths"][name]))
+    return "".join(out)
+
+
+def render_kernel_path_names(doc):
+    """内核 devfs 是**逐段**拼的（add_child("consoles", ...)），故这里只取末段。
+
+    取末段而不是让 JSON 再写一遍段名：段名是完整路径的**派生量**，写第二遍就多一个
+    可以漂移的地方。
+    """
+    out = ["\n// ---------- devfs 段名（由完整路径派生，勿手改） ----------\n\n"]
+    for const, key in (("CONSOLE_NODE_NAME", "CONSOLE_PATH"),
+                       ("CONSOLES_DIR_NAME", "CONSOLES_DIR_PREFIX")):
+        seg = doc["paths"][key].rstrip("/").rsplit("/", 1)[-1]
+        out.append('pub const %s: &str = "%s";\n' % (const, seg))
+    return "".join(out)
+
+
 def render_syscalls(doc, dom_path, op_path):
     """生成物**引用**该侧手写的 domain/op 模块，而不是写死数字。
 
@@ -135,11 +156,11 @@ GEN_FILES = (
      lambda doc: render_syscalls(doc, "crate::syscall::domain", "crate::syscall::op")
      + render_values(doc, KERNEL_VALUES)),
     ("kernel:klib", K_KLIB_GEN, render_kernel_errno),
-    ("kernel:vfs", K_VFS_GEN, lambda doc: HEADER.replace("@SRC@", SRC_REL) + render_values(doc, VFS_VALUES)),
+    ("kernel:vfs", K_VFS_GEN, lambda doc: HEADER.replace("@SRC@", SRC_REL) + render_values(doc, VFS_VALUES) + render_kernel_path_names(doc)),
     ("kernel:ipc", K_IPC_GEN, lambda doc: HEADER.replace("@SRC@", SRC_REL) + render_values(doc, IPC_VALUES)),
     ("libsys", L_GEN,
      lambda doc: render_syscalls(doc, "crate::nr::domain", "crate::nr::op")
-     + render_libsys_errno(doc) + render_values(doc, LIBSYS_VALUES)),
+     + render_libsys_errno(doc) + render_values(doc, LIBSYS_VALUES) + render_libsys_paths(doc)),
     ("libc", LIBC_GEN, lambda doc: HEADER.replace("@SRC@", SRC_REL)
      + "use crate::ctypes::{c_int, c_long};\n" + render_values(doc, LIBC_VALUES)),
 )
@@ -165,6 +186,9 @@ VALUE_HARDCODED = (
     ("libsys/src/nr.rs", r"pub const FLOCK_CMD_[A-Z]+: u64 = \d+;"),
     ("libc/src/unistd.rs", r"_PC_(?:PATH_MAX|NAME_MAX|PIPE_BUF) => -?\d+,"),
     ("libc/src/unistd.rs", r"fn getpagesize\(\) -> c_int \{\s*\d+"),
+    # 路径：两侧都不得再写死（测试里的硬编码**不算**——那是独立核对，故意不跟随）
+    ("libsys/src/event.rs", r'pub const (?:CONSOLE_PATH|CONSOLES_DIR_PREFIX): &str = "'),
+    ("kernel/crates/vfs/src/devfs.rs", r'root\.add_child\("(?:console|consoles)"'),
 )
 
 
