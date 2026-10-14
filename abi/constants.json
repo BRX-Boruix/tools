@@ -427,5 +427,10 @@
   "paths": {
     "CONSOLE_PATH": "/devices/console",
     "CONSOLES_DIR_PREFIX": "/devices/consoles/"
+  },
+  "tokens": {
+    "DATA_VOLUME_LABEL": "BORUIX_DATA",
+    "THIRD_PARTY_SUBDIR": "3p",
+    "PROGRAM_DIR": "/programs"
   }
 }

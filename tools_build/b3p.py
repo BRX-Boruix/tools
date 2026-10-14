@@ -33,6 +33,7 @@ import os
 import shutil
 import subprocess
 
+from abi import generated
 from . import config
 from .util import err, info
 
@@ -49,7 +50,7 @@ THIRD_PARTY_PROGRAMS = (
 
 # 第三方程序产物在 diskfiles 下的子目录名。
 # 与挂载点组合即运行路径：/volumes/BORUIX_DATA/3p/<name>.elf。
-THIRD_PARTY_SUBDIR = "3p"
+THIRD_PARTY_SUBDIR = generated.THIRD_PARTY_SUBDIR
 
 # 构建 profile：第三方程序默认 release。
 #

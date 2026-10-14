@@ -15,6 +15,7 @@ import subprocess
 import sys
 import uuid
 
+from abi import generated
 from . import config
 from .util import err, info
 
@@ -608,7 +609,7 @@ def compute_disk_size_mb(files):
     return max(size_mb, DISK_MIN_SIZE_MB)
 
 
-def create_ext2_disk_image(path, size_mb=None, label="BORUIX_DATA", src=None):
+def create_ext2_disk_image(path, size_mb=None, label=generated.DATA_VOLUME_LABEL, src=None):
     """创建数据盘：MBR 分区 1 + EXT2，内容取自 `tools/diskfiles/`。返回 True。
 
     - `size_mb=None`（默认）：按内容自动推算容量；显式传入则用作覆盖值。
@@ -780,7 +781,7 @@ def cmd_mkimg(args):
     """
     path = getattr(args, "output", DISK_IMG_PATH)
     size_mb = getattr(args, "size", None)
-    label = getattr(args, "label", "BORUIX_DATA")
+    label = getattr(args, "label", generated.DATA_VOLUME_LABEL)
     force = getattr(args, "force", False)
     if os.path.isfile(path) and not force:
         # 非交互环境**绝不阻塞**：stdin 不是终端时 `input()` 可能永远读不到 EOF（管道不关闭），

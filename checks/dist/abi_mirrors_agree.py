@@ -480,43 +480,61 @@ def check_struct_layouts():
     return ok
 
 
-# 单 token 契约：同一标识在多处必须**逐字节相同**（不是路径段后缀关系，故单列一类）。
-# 例：卷标 BORUIX_DATA —— 磁盘镜像用它命名，内核据此挂到 /volumes/<label>，
-# 而用户态把 /volumes/BORUIX_DATA/... 写死在多处。改一处而不改另一处，
-# 表现为"数据盘在，但 /volumes/BORUIX_DATA 不存在"，且没有任何东西会报错。
-TOKEN_CONTRACTS = (
-    ("3p 子目录名（tcc 安装目录 ↔ 宿主 staging）", (
-        ("tcc-on-boruix/boruix/config.h", r'CONFIG_TCCDIR "/volumes/BORUIX_DATA/([A-Za-z0-9_]+)/tcc"'),
-        ("tools/tools_build/b3p.py", r'THIRD_PARTY_SUBDIR = "([A-Za-z0-9_]+)"'),
-    )),
-    ("数据盘卷标", (
-        ("tools/main.py", r'--label",\s*default="([A-Za-z0-9_]+)"'),
-        ("tools/tools_build/disk.py", r'def create_ext2_disk_image\([^)]*label="([A-Za-z0-9_]+)"'),
-        ("shell/src/env.rs", r'DEFAULT_PATH: &\[u8\] = b"[^"]*/volumes/([A-Za-z0-9_]+)/'),
-        ("init/src/main.rs", r'let probe = "/volumes/([A-Za-z0-9_]+)/welcome\.txt"'),
-    )),
+# ---------- 7. 单 token 契约 ----------
+#
+# **2026-10-14 起改为「生成 + 接线检查」**（与 1/2/4/5 类同一改法）。卷标 BORUIX_DATA
+# 与 3p 子目录名此前在 tools（2 个文件）/ shell / init / tcc 各写一份，由本类比对；
+# 现在唯一事实源是 tools/abi/constants.json 的 tokens 节，各侧由 generate.py 生成。
+# 故本类改查**接线**：各站点必须引用生成物，且不得再写死。
+
+TOKEN_WIRING = (
+    ("数据盘卷标（argparse 默认）", "tools/main.py",
+     r"default=generated\.DATA_VOLUME_LABEL"),
+    ("数据盘卷标（disk.py 签名）", "tools/tools_build/disk.py",
+     r"label=generated\.DATA_VOLUME_LABEL"),
+    ("数据盘卷标（disk.py getattr）", "tools/tools_build/disk.py",
+     r'getattr\(args, "label", generated\.DATA_VOLUME_LABEL\)'),
+    ("3p 子目录名", "tools/tools_build/b3p.py",
+     r"THIRD_PARTY_SUBDIR = generated\.THIRD_PARTY_SUBDIR"),
+    ("默认 PATH", "shell/src/env.rs",
+     r"pub\(crate\) const DEFAULT_PATH: &\[u8\] = crate::abi_generated::DEFAULT_PATH;"),
+    ("数据盘探针", "init/src/main.rs", r"let probe = libsys::WELCOME_PROBE;"),
+)
+
+TOKEN_HARDCODED = (
+    ("tools/main.py", r'default="BORUIX_DATA"'),
+    ("tools/tools_build/disk.py", r'label="BORUIX_DATA"'),
+    ("tools/tools_build/b3p.py", r'THIRD_PARTY_SUBDIR = "3p"'),
+    ("shell/src/env.rs", r'b"/programs:/volumes/BORUIX_DATA/3p"'),
+    ("init/src/main.rs", r'"/volumes/BORUIX_DATA/welcome\.txt"'),
 )
 
 
 def check_token_contracts():
+    import json as _json
     ok = True
-    print("[abi-mirror] 单 token 契约：%d 条" % len(TOKEN_CONTRACTS))
-    for concept, sites in TOKEN_CONTRACTS:
-        found = []
-        for rel, pattern in sites:
-            m = re.search(pattern, read(rel))
-            if not m:
-                print("  FAIL %s：在 %s 里解析不出（正则 %s）" % (concept, rel, pattern))
-                ok = False
-                continue
-            found.append((m.group(1), rel))
-        if len({v for v, _ in found}) > 1:
-            print("  FAIL %s：多处取值不一致" % concept)
-            for v, rel in found:
-                print("        %-24s %s" % (v, rel))
+    with open(os.path.join(ROOT, ABI_JSON), encoding="utf-8") as fh:
+        tk = _json.load(fh)["tokens"]
+    third = "/volumes/%s/%s" % (tk["DATA_VOLUME_LABEL"], tk["THIRD_PARTY_SUBDIR"])
+    print("[abi-mirror] 单 token 契约：单一事实源 %s（卷标 %s / 3p 子目录 %s）"
+          % (ABI_JSON, tk["DATA_VOLUME_LABEL"], tk["THIRD_PARTY_SUBDIR"]))
+    for concept, rel, pat in TOKEN_WIRING:
+        if not re.search(pat, read(rel)):
+            print("  FAIL %s：%s 里没有引用生成物（应匹配 %s）" % (concept, rel, pat))
             ok = False
-        elif found:
-            print("  OK   %s = %s（%d 处）" % (concept, found[0][0], len(found)))
+    # tcc 的 config.h 是**整行生成**（前后还有大量手写说明）：直接核对它等于 JSON 派生的值。
+    m = re.search(r'#define CONFIG_TCCDIR "([^"]*)"', read("tcc-on-boruix/boruix/config.h"))
+    if not m or m.group(1) != third + "/tcc":
+        print("  FAIL tcc 的 CONFIG_TCCDIR 与 JSON 不一致：实为 %s，应为 %s/tcc"
+              % (m.group(1) if m else "缺失", third))
+        ok = False
+    for rel, pat in TOKEN_HARDCODED:
+        mm = re.search(pat, read(rel))
+        if mm:
+            print("  FAIL %s 里仍有写死的 token：%s" % (rel, mm.group(0)))
+            ok = False
+    if ok:
+        print("  OK   %d 个站点全部引用生成物；C 头的整行与 JSON 同值" % len(TOKEN_WIRING))
     return ok
 
 

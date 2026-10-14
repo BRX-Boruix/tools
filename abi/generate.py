@@ -59,6 +59,8 @@ K_VFS_GEN = os.path.join(ROOT, "kernel", "crates", "vfs", "src", "abi_generated.
 K_IPC_GEN = os.path.join(ROOT, "kernel", "crates", "ipc", "src", "abi_generated.rs")
 L_GEN = os.path.join(ROOT, "libsys", "src", "abi_generated.rs")
 LIBC_GEN = os.path.join(ROOT, "libc", "src", "abi_generated.rs")
+TOOLS_GEN = os.path.join(ROOT, "tools", "abi", "generated.py")
+SHELL_GEN = os.path.join(ROOT, "shell", "src", "abi_generated.rs")
 
 K_SYSCALL_HAND = os.path.join(ROOT, "kernel", "crates", "kernel", "src", "syscall.rs")
 L_NR_HAND = os.path.join(ROOT, "libsys", "src", "nr.rs")
@@ -86,6 +88,56 @@ def render_values(doc, entries):
     for name, ty in entries:
         out.append("pub const %s: %s = %d;\n" % (name, ty, doc["values"][name]))
     return "".join(out)
+
+
+def token_values(doc):
+    """由 tokens 节派生出的值。派生而不写第二遍：卷标与子目录名是**唯一**输入。"""
+    t = doc["tokens"]
+    label = t["DATA_VOLUME_LABEL"]
+    sub = t["THIRD_PARTY_SUBDIR"]
+    vol = "/volumes/" + label
+    third = vol + "/" + sub
+    return {
+        "DATA_VOLUME_LABEL": label,
+        "THIRD_PARTY_SUBDIR": sub,
+        "DATA_VOLUME_PATH": vol,
+        "THIRD_PARTY_PATH": third,
+        "WELCOME_PROBE": vol + "/welcome.txt",
+        "TCC_DIR": third + "/tcc",
+        "DEFAULT_PATH": t["PROGRAM_DIR"] + ":" + third,
+    }
+
+
+def render_python_tokens(doc):
+    """给 tools 侧用的 Python 常量（main.py / disk.py / b3p.py 都从这里取）。"""
+    v = token_values(doc)
+    return (
+        "# **自动生成，请勿手改。**\n"
+        "# 源：tools/abi/constants.json\n"
+        "# 生成：python tools/abi/generate.py\n"
+        "# 门禁：python tools/abi/generate.py --check\n\n"
+        'DATA_VOLUME_LABEL = "%s"\n'
+        'THIRD_PARTY_SUBDIR = "%s"\n'
+        'DATA_VOLUME_PATH = "%s"\n'
+        'THIRD_PARTY_PATH = "%s"\n' % (v["DATA_VOLUME_LABEL"], v["THIRD_PARTY_SUBDIR"],
+                                        v["DATA_VOLUME_PATH"], v["THIRD_PARTY_PATH"])
+    )
+
+
+def render_libsys_tokens(doc):
+    v = token_values(doc)
+    out = ["\n// ---------- 系统标识 token（卷标 / 3p 子目录 / 由它们派生的路径） ----------\n\n"]
+    for k in ("DATA_VOLUME_LABEL", "THIRD_PARTY_SUBDIR", "DATA_VOLUME_PATH",
+              "THIRD_PARTY_PATH", "WELCOME_PROBE"):
+        out.append('pub const %s: &str = "%s";\n' % (k, v[k]))
+    return "".join(out)
+
+
+def render_shell_tokens(doc):
+    v = token_values(doc)
+    return (HEADER.replace("@SRC@", SRC_REL)
+            + "\n// ---------- 默认 PATH（由 ABI token 拼出；组合策略在 JSON 里） ----------\n\n"
+            + 'pub(crate) const DEFAULT_PATH: &[u8] = b"%s";\n' % v["DEFAULT_PATH"])
 
 
 def render_libsys_paths(doc):
@@ -151,6 +203,24 @@ def render_libsys_errno(doc):
     return "".join(out)
 
 
+def render_libc_tokens(doc):
+    """libc 侧的 token：confstr(_CS_PATH) 与 shell 的 DEFAULT_PATH 必须同一份。
+
+    带结尾 NUL（`\0`）：confstr 的返回值含 NUL，故这里给出**已含 NUL** 的字节串。
+    """
+    return ("\n// ---------- 默认 PATH（与 shell 的 DEFAULT_PATH 同源） ----------\n\n"
+            'pub const DEFAULT_PATH_C: &[u8] = b"%s\\0";\n' % token_values(doc)["DEFAULT_PATH"])
+
+
+# **整行生成**：C 头文件里的一行由生成器重写（`#define` 前后还有大量手写说明，
+# 不适合整文件生成）。判据：该行必须与生成结果**逐字节相同**。
+C_CONFIG_H = os.path.join(ROOT, "tcc-on-boruix", "boruix", "config.h")
+LINE_TARGETS = (
+    ("tcc:CONFIG_TCCDIR", C_CONFIG_H, r'#define CONFIG_TCCDIR "[^"]*"',
+     lambda doc: '#define CONFIG_TCCDIR "%s"' % token_values(doc)["TCC_DIR"]),
+)
+
+
 GEN_FILES = (
     ("kernel:kernel", K_SYSCALL_GEN,
      lambda doc: render_syscalls(doc, "crate::syscall::domain", "crate::syscall::op")
@@ -160,9 +230,13 @@ GEN_FILES = (
     ("kernel:ipc", K_IPC_GEN, lambda doc: HEADER.replace("@SRC@", SRC_REL) + render_values(doc, IPC_VALUES)),
     ("libsys", L_GEN,
      lambda doc: render_syscalls(doc, "crate::nr::domain", "crate::nr::op")
-     + render_libsys_errno(doc) + render_values(doc, LIBSYS_VALUES) + render_libsys_paths(doc)),
+     + render_libsys_errno(doc) + render_values(doc, LIBSYS_VALUES)
+     + render_libsys_paths(doc) + render_libsys_tokens(doc)),
     ("libc", LIBC_GEN, lambda doc: HEADER.replace("@SRC@", SRC_REL)
-     + "use crate::ctypes::{c_int, c_long};\n" + render_values(doc, LIBC_VALUES)),
+     + "use crate::ctypes::{c_int, c_long};\n" + render_values(doc, LIBC_VALUES)
+     + render_libc_tokens(doc)),
+    ("tools:generated.py", TOOLS_GEN, render_python_tokens),
+    ("shell:abi", SHELL_GEN, render_shell_tokens),
 )
 
 # (标签, 手写文件, 是否检查 domain/op, 是否检查 errno 委托, 是否检查数值引用)
@@ -189,6 +263,13 @@ VALUE_HARDCODED = (
     # 路径：两侧都不得再写死（测试里的硬编码**不算**——那是独立核对，故意不跟随）
     ("libsys/src/event.rs", r'pub const (?:CONSOLE_PATH|CONSOLES_DIR_PREFIX): &str = "'),
     ("kernel/crates/vfs/src/devfs.rs", r'root\.add_child\("(?:console|consoles)"'),
+    # token（卷标 / 3p 子目录 / 由它们派生的路径）：各站点都不得再写死
+    ("tools/main.py", r'default="BORUIX_DATA"'),
+    ("tools/tools_build/disk.py", r'label="BORUIX_DATA"'),
+    ("tools/tools_build/disk.py", r'getattr\(args, "label", "BORUIX_DATA"\)'),
+    ("tools/tools_build/b3p.py", r'THIRD_PARTY_SUBDIR = "3p"'),
+    ("shell/src/env.rs", r'b"/programs:/volumes/BORUIX_DATA/3p"'),
+    ("init/src/main.rs", r'"/volumes/BORUIX_DATA/welcome\.txt"'),
 )
 
 
@@ -231,6 +312,28 @@ def main():
             print("[abi-gen] FAIL %s：生成物与 %s 不一致 —— 跑 python tools/abi/generate.py --write"
                   % (label, SRC_REL))
             ok = False
+
+    # 整行目标（C 头里的一行）
+    for label, path, pat, render in LINE_TARGETS:
+        txt = open(path, encoding="utf-8", newline="").read()
+        want = render(doc)
+        m = re.search(pat, txt)
+        if a.write:
+            if not m:
+                print("[abi-gen] FAIL %s：在 %s 里找不到可重写的行（正则 %s）" % (label, path, pat))
+                ok = False
+            elif m.group(0) != want:
+                open(path, "w", encoding="utf-8", newline="").write(
+                    txt[:m.start()] + want + txt[m.end():])
+                print("[abi-gen] %-14s 已重写 %s" % (label, os.path.relpath(path, ROOT)))
+        else:
+            if not m:
+                print("[abi-gen] FAIL %s：%s 里找不到该行（正则 %s）" % (label, path, pat))
+                ok = False
+            elif m.group(0) != want:
+                print("[abi-gen] FAIL %s：%s 实为 %r，应为 %r"
+                      % (label, path, m.group(0), want))
+                ok = False
 
     if a.write:
         return 0
