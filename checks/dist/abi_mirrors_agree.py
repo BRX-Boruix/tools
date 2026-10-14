@@ -94,54 +94,67 @@ def eval_int(expr):
 
 
 # ---------- 1. syscall 号 ----------
+#
+# **2026-10-14 起改为「生成 + 接线检查」**。此前两侧各手写一份、本类比对数值；
+# 现在数值的唯一事实源是 tools/abi/constants.json，两侧由 tools/abi/generate.py 生成。
+# 故本类不再比数值（那是 generate.py --check 的职责），改查**接线**：
+#   - 两侧手写文件里不得再有写死的 SYS_* 数值（必须引用 crate::abi_generated::*）；
+#   - 引用的目标名必须与常量名一致；
+#   - 两侧的 SYS_* 名字集合必须与 JSON 完全一致（不多不少）。
 
-def parse_syscall_table(rel):
+ABI_JSON = os.path.join("tools", "abi", "constants.json")
+
+
+def parse_abi_json():
+    import json as _json
+    with open(os.path.join(ROOT, ABI_JSON), encoding="utf-8") as fh:
+        doc = _json.load(fh)
+    doms, ops = doc["syscall_domains"], doc["syscall_ops"]
+    out = {}
+    for name, e in doc["syscalls"].items():
+        o = e["op"]
+        out[name] = doms[e["domain"]] | (ops[o] if isinstance(o, str) else int(o))
+    return out
+
+
+def parse_generated_refs(rel):
+    """手写文件里的 SYS_* 定义现在必须是 crate::abi_generated::SYS_X 的引用。"""
     txt = read(rel)
-    simple = {}
-    for m in re.finditer(r"pub const ([A-Za-z_][A-Za-z0-9_]*)\s*:\s*u32\s*=\s*(0x[0-9A-Fa-f_]+|[0-9_]+)\s*;", txt):
-        simple[m.group(1)] = int(m.group(2).replace("_", ""), 0)
-    out, unresolved = {}, []
-    for m in re.finditer(r"pub const (SYS_[A-Z0-9_]+)\s*:\s*u32\s*=\s*([^;]+);", txt):
-        name, expr = m.group(1), m.group(2).strip()
-        mm = re.match(r"nr\(\s*([^,]+?)\s*,\s*([^)]+?)\s*\)$", expr)
-        try:
-            if mm:
-                def ev(x):
-                    x = x.strip().split("::")[-1]
-                    if x in simple:
-                        return simple[x]
-                    return int(x, 0)
-                out[name] = ev(mm.group(1)) | ev(mm.group(2))
-            else:
-                out[name] = int(expr.split("::")[-1], 0)
-        except ValueError:
-            unresolved.append(name)
-    return out, unresolved
+    refs = {}
+    for m in re.finditer(
+        r"pub const (SYS_[A-Z0-9_]+): u32 = crate::abi_generated::([A-Za-z0-9_]+);", txt
+    ):
+        refs[m.group(1)] = m.group(2)
+    hard = [m.group(1) for m in re.finditer(
+        r"pub const (SYS_[A-Z0-9_]+): u32 = (?!crate::abi_generated::)[^;]+;", txt
+    )]
+    return refs, hard
 
 
 def check_syscall_table():
-    k, ku = parse_syscall_table(KERNEL_SYSCALL)
-    l, lu = parse_syscall_table(LIBSYS_NR)
-    bad = []
-    for name in sorted(set(k) & set(l)):
-        if k[name] != l[name]:
-            bad.append((name, k[name], l[name]))
-    only_k = sorted(set(k) - set(l))
-    only_l = sorted(set(l) - set(k))
-    new_asym = [n for n in only_k + only_l if n not in TRIAGED_ASYMMETRY]
-    print("[abi-mirror] syscall 号：kernel %d 项 / libsys %d 项，共同 %d 项" % (len(k), len(l), len(set(k) & set(l))))
-    if ku or lu:
-        print("  WARN 解析不出的项：%s" % (ku + lu))
-    for name, kv, lv in bad:
-        print("  FAIL %s：kernel=0x%02X libsys=0x%02X" % (name, kv, lv))
-    for name in sorted(set(only_k) & set(TRIAGED_ASYMMETRY)):
-        print("  TRIAGED 仅内核侧 %s —— %s" % (name, TRIAGED_ASYMMETRY[name]))
-    for name in sorted(set(only_l) & set(TRIAGED_ASYMMETRY)):
-        print("  TRIAGED 仅用户态侧 %s —— %s" % (name, TRIAGED_ASYMMETRY[name]))
-    for name in new_asym:
-        side = "仅内核侧" if name in only_k else "仅用户态侧"
-        print("  FAIL 未登记的不对称：%s（%s）" % (name, side))
-    return not bad and not new_asym
+    ref = parse_abi_json()
+    ok = True
+    print("[abi-mirror] syscall 号：单一事实源 %s，%d 项" % (ABI_JSON, len(ref)))
+    for rel in (KERNEL_SYSCALL, LIBSYS_NR):
+        refs, hard = parse_generated_refs(rel)
+        if hard:
+            print("  FAIL %s 里仍有写死的 SYS_* 数值：%s" % (rel, hard[:5]))
+            ok = False
+        wrong = sorted(n for n, tgt in refs.items() if n != tgt)
+        if wrong:
+            print("  FAIL %s 引用的目标名与常量名不一致：%s" % (rel, wrong[:5]))
+            ok = False
+        missing = sorted(set(ref) - set(refs))
+        extra = sorted(set(refs) - set(ref))
+        if missing:
+            print("  FAIL %s 缺少 %d 项：%s" % (rel, len(missing), missing[:5]))
+            ok = False
+        if extra:
+            print("  FAIL %s 多出 %d 项：%s" % (rel, len(extra), extra[:5]))
+            ok = False
+        if not (hard or wrong or missing or extra):
+            print("  OK   %s：%d 项全部引用生成物" % (rel, len(refs)))
+    return ok
 
 
 # ---------- 2. 错误码 ----------

@@ -38,6 +38,10 @@ OFFLINE_CHECKS = (
     "checks/dist/confstr_path_agrees.py",
     # 跨边界镜像常量门禁（syscall 号 / 错误码 / C 头常量 / 路径契约），同样自足。
     "checks/dist/abi_mirrors_agree.py",
+    # 跨边界常量的**单一事实源**（tools/abi/constants.json）与两侧生成物的一致性。
+    # 此前是"两侧各手写 + 门禁比对数值"；现在数值只有一处，两侧由生成器落盘，
+    # 本项负责"生成物没被手改 / 手写 domain·op 与 JSON 一致 / 没有写死的 SYS_* 数值"。
+    "abi/generate.py",
     # libc 侧的三项自足审计（纯源码扫描，不需 sysroot/clang）：errno 常量两侧一致、
     # 桩符号清单无新增、C 可见导出都有头文件声明（内部符号须在 TRIAGED_INTERNAL 登记）。
     "../libc/tools/audit_errno_sync.py",

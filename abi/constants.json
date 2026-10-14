@@ -1,0 +1,324 @@
+{
+  "_": [
+    "跨边界常量的**单一事实源**。改这里，然后跑 python tools/abi/generate.py。",
+    "生成物（勿手改）：kernel/crates/kernel/src/abi_generated.rs、libsys/src/abi_generated.rs。",
+    "门禁：tools/abi/generate.py --check 会比对生成物是否与本源一致（已登记进 checks/run_all.py）。",
+    "初版由 tools 侧一次性提取脚本从两侧现状生成，并逐项校验两侧相等——迁移本身不引入漂移。"
+  ],
+  "version": 1,
+  "syscall_domains": {
+    "AUDIO": 160,
+    "DEVICE": 80,
+    "MEMORY": 32,
+    "POWER": 144,
+    "SIGNAL": 128,
+    "STREAM": 16,
+    "SYNC": 112,
+    "TASK": 48,
+    "VFS": 64,
+    "VOLUME": 96
+  },
+  "syscall_ops": {
+    "CREATE": 1,
+    "DELETE": 4,
+    "EVENT": 7,
+    "FORMAT": 5,
+    "READ": 2,
+    "UNMOUNT": 6,
+    "WRITE": 3
+  },
+  "syscalls": {
+    "SYS_AUDIO_ATTACH": {
+      "domain": "AUDIO",
+      "op": 1
+    },
+    "SYS_AUDIO_COMMIT": {
+      "domain": "AUDIO",
+      "op": 4
+    },
+    "SYS_AUDIO_DETACH": {
+      "domain": "AUDIO",
+      "op": 2
+    },
+    "SYS_AUDIO_FETCH": {
+      "domain": "AUDIO",
+      "op": 3
+    },
+    "SYS_DEVICE_PROBE": {
+      "domain": "DEVICE",
+      "op": 8
+    },
+    "SYS_DRIVER_CLAIM": {
+      "domain": "DEVICE",
+      "op": "WRITE"
+    },
+    "SYS_DRIVER_DMA_ALLOC": {
+      "domain": "DEVICE",
+      "op": 10
+    },
+    "SYS_DRIVER_DMA_FREE": {
+      "domain": "DEVICE",
+      "op": 11
+    },
+    "SYS_DRIVER_DMA_PHYS": {
+      "domain": "DEVICE",
+      "op": 12
+    },
+    "SYS_DRIVER_EVENT_NEXT": {
+      "domain": "DEVICE",
+      "op": "EVENT"
+    },
+    "SYS_DRIVER_IRQ_WAIT": {
+      "domain": "DEVICE",
+      "op": 9
+    },
+    "SYS_DRIVER_QUERY": {
+      "domain": "DEVICE",
+      "op": "READ"
+    },
+    "SYS_DRIVER_REGISTER": {
+      "domain": "DEVICE",
+      "op": "CREATE"
+    },
+    "SYS_DRIVER_UNREGISTER": {
+      "domain": "DEVICE",
+      "op": "DELETE"
+    },
+    "SYS_ENTRY_CHDIR": {
+      "domain": "VFS",
+      "op": 5
+    },
+    "SYS_ENTRY_CREATE": {
+      "domain": "VFS",
+      "op": "CREATE"
+    },
+    "SYS_ENTRY_DELETE": {
+      "domain": "VFS",
+      "op": "DELETE"
+    },
+    "SYS_ENTRY_GETCWD": {
+      "domain": "VFS",
+      "op": 6
+    },
+    "SYS_ENTRY_LINK": {
+      "domain": "VFS",
+      "op": 9
+    },
+    "SYS_ENTRY_READ": {
+      "domain": "VFS",
+      "op": "READ"
+    },
+    "SYS_ENTRY_READLINK": {
+      "domain": "VFS",
+      "op": 8
+    },
+    "SYS_ENTRY_SYMLINK": {
+      "domain": "VFS",
+      "op": 7
+    },
+    "SYS_ENTRY_UPDATE": {
+      "domain": "VFS",
+      "op": "WRITE"
+    },
+    "SYS_MEMORY_GROW": {
+      "domain": "MEMORY",
+      "op": "WRITE"
+    },
+    "SYS_MEMORY_MAP": {
+      "domain": "MEMORY",
+      "op": "CREATE"
+    },
+    "SYS_MEMORY_PROTECT": {
+      "domain": "MEMORY",
+      "op": 5
+    },
+    "SYS_MEMORY_QUERY": {
+      "domain": "MEMORY",
+      "op": "READ"
+    },
+    "SYS_MEMORY_UNMAP": {
+      "domain": "MEMORY",
+      "op": "DELETE"
+    },
+    "SYS_POWER_OFF": {
+      "domain": "POWER",
+      "op": 1
+    },
+    "SYS_POWER_REBOOT": {
+      "domain": "POWER",
+      "op": 2
+    },
+    "SYS_SIGNAL_ACTION": {
+      "domain": "SIGNAL",
+      "op": "WRITE"
+    },
+    "SYS_SIGNAL_ALARM": {
+      "domain": "SIGNAL",
+      "op": 7
+    },
+    "SYS_SIGNAL_ALTSTACK": {
+      "domain": "SIGNAL",
+      "op": 8
+    },
+    "SYS_SIGNAL_MASK": {
+      "domain": "SIGNAL",
+      "op": "READ"
+    },
+    "SYS_SIGNAL_PENDING": {
+      "domain": "SIGNAL",
+      "op": 5
+    },
+    "SYS_SIGNAL_RETURN": {
+      "domain": "SIGNAL",
+      "op": "DELETE"
+    },
+    "SYS_SIGNAL_SUSPEND": {
+      "domain": "SIGNAL",
+      "op": 6
+    },
+    "SYS_STREAM_CLOSE": {
+      "domain": "STREAM",
+      "op": "DELETE"
+    },
+    "SYS_STREAM_CREATE": {
+      "domain": "STREAM",
+      "op": "CREATE"
+    },
+    "SYS_STREAM_DUP": {
+      "domain": "STREAM",
+      "op": 5
+    },
+    "SYS_STREAM_FCHMOD": {
+      "domain": "STREAM",
+      "op": 11
+    },
+    "SYS_STREAM_FCHOWN": {
+      "domain": "STREAM",
+      "op": 12
+    },
+    "SYS_STREAM_FOCUS_SET": {
+      "domain": "STREAM",
+      "op": 8
+    },
+    "SYS_STREAM_FSTAT": {
+      "domain": "STREAM",
+      "op": 7
+    },
+    "SYS_STREAM_FSYNC": {
+      "domain": "STREAM",
+      "op": 10
+    },
+    "SYS_STREAM_FTRUNCATE": {
+      "domain": "STREAM",
+      "op": 9
+    },
+    "SYS_STREAM_LOCK": {
+      "domain": "STREAM",
+      "op": 6
+    },
+    "SYS_STREAM_READ": {
+      "domain": "STREAM",
+      "op": "READ"
+    },
+    "SYS_STREAM_WRITE": {
+      "domain": "STREAM",
+      "op": "WRITE"
+    },
+    "SYS_SYNC_CREATE": {
+      "domain": "SYNC",
+      "op": "CREATE"
+    },
+    "SYS_SYNC_DELETE": {
+      "domain": "SYNC",
+      "op": "DELETE"
+    },
+    "SYS_SYNC_WAIT": {
+      "domain": "SYNC",
+      "op": "READ"
+    },
+    "SYS_SYNC_WAKE": {
+      "domain": "SYNC",
+      "op": "WRITE"
+    },
+    "SYS_TASK_DERIVE": {
+      "domain": "TASK",
+      "op": 10
+    },
+    "SYS_TASK_EXIT": {
+      "domain": "TASK",
+      "op": "DELETE"
+    },
+    "SYS_TASK_GETPID": {
+      "domain": "TASK",
+      "op": 9
+    },
+    "SYS_TASK_GETTID": {
+      "domain": "TASK",
+      "op": 8
+    },
+    "SYS_TASK_GROUPS_GET": {
+      "domain": "TASK",
+      "op": 14
+    },
+    "SYS_TASK_GROUPS_SET": {
+      "domain": "TASK",
+      "op": 13
+    },
+    "SYS_TASK_IDENTITY_QUERY": {
+      "domain": "TASK",
+      "op": 11
+    },
+    "SYS_TASK_IDENTITY_SET": {
+      "domain": "TASK",
+      "op": 12
+    },
+    "SYS_TASK_NICE": {
+      "domain": "TASK",
+      "op": 15
+    },
+    "SYS_TASK_SET_FS_BASE": {
+      "domain": "TASK",
+      "op": 7
+    },
+    "SYS_TASK_SIGNAL": {
+      "domain": "TASK",
+      "op": "WRITE"
+    },
+    "SYS_TASK_SPAWN": {
+      "domain": "TASK",
+      "op": "CREATE"
+    },
+    "SYS_TASK_THREAD_JOIN": {
+      "domain": "TASK",
+      "op": 6
+    },
+    "SYS_TASK_THREAD_SPAWN": {
+      "domain": "TASK",
+      "op": 5
+    },
+    "SYS_TASK_WAIT": {
+      "domain": "TASK",
+      "op": "READ"
+    },
+    "SYS_VOLUME_FORMAT": {
+      "domain": "VOLUME",
+      "op": "FORMAT"
+    },
+    "SYS_VOLUME_LIST": {
+      "domain": "VOLUME",
+      "op": "READ"
+    },
+    "SYS_VOLUME_MOUNT": {
+      "domain": "VOLUME",
+      "op": "CREATE"
+    },
+    "SYS_VOLUME_UNMOUNT": {
+      "domain": "VOLUME",
+      "op": "UNMOUNT"
+    },
+    "SYS_VOLUME_UPDATE": {
+      "domain": "VOLUME",
+      "op": "WRITE"
+    }
+  }
+}
