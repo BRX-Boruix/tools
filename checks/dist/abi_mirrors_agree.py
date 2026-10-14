@@ -212,6 +212,25 @@ def check_header_consts():
         # 只扫 pub 会让这一类（实测 FP_*/BUFSIZ 共 6 个）完全逃过核对。
         for m in re.finditer(r"(?:pub\s+)?const ([A-Za-z_][A-Za-z0-9_]*)\s*:\s*[^=;]+?=\s*([^;]+);", txt):
             rs.setdefault(m.group(1), []).append((m.group(2).strip(), os.path.relpath(p, ROOT), txt[:m.start()].count("\n") + 1))
+    # **已生成的一族**：134 个 errno 常量现在由 tools/abi/constants.json 的 errno_table
+    # 同时产出（errno.h 的 #define 行 + libc/src/abi_generated.rs 的常量）。它们不再参与
+    # 本类的"两份手写比对"，但**必须显式报数**——否则覆盖会静默流失（本仓踩过这个坑：
+    # 名字从一侧消失时交集变小，类仍然"通过"）。
+    import json as _json
+    with open(os.path.join(ROOT, ABI_JSON), encoding="utf-8") as fh:
+        _errno_tbl = _json.load(fh)["errno_table"]
+    for _n in _errno_tbl:
+        hdr.pop(_n, None)
+        rs.pop(_n, None)
+    errno_rs = read("libc/src/errno.rs")
+    wired = len(re.findall(r"pub use crate::abi_generated::E[A-Z0-9_]+;", errno_rs))
+    if wired != len(_errno_tbl):
+        print("  FAIL libc/src/errno.rs：只有 %d 项引用生成物，errno_table 有 %d 项"
+              % (wired, len(_errno_tbl)))
+        return False
+    print("[abi-mirror] errno：%d 项**已生成**（errno.h 的 #define 行 + abi_generated.rs），"
+          "不参与下面的两份手写比对" % len(_errno_tbl))
+
     compared, bad, skipped = 0, [], []
     for name in sorted(set(hdr) & set(rs)):
         hv = {eval_int(v) for v, _, _ in hdr[name]} - {None}
@@ -224,7 +243,7 @@ def check_header_consts():
         MASK = (1 << 64) - 1
         if not ({v & MASK for v in hv} & {v & MASK for v in rv}):
             bad.append((name, hdr[name], rs[name]))
-    print("[abi-mirror] C 头 <-> Rust 常量：同名 %d 项，可比 %d 项，跳过（含符号名）%d 项"
+    print("[abi-mirror] C 头 <-> Rust 常量（errno 之外）：同名 %d 项，可比 %d 项，跳过（含符号名）%d 项"
           % (len(set(hdr) & set(rs)), compared, len(skipped)))
     for name, h, r in bad:
         print("  FAIL %s" % name)

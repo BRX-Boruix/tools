@@ -185,7 +185,8 @@ def render_kernel_errno(doc):
     out = [HEADER.replace("@SRC@", SRC_REL), "// ---------- Error -> errno ----------\n\n"]
     out.append("pub const fn to_errno(e: crate::error::Error) -> i32 {\n    match e {\n")
     for name, e in doc["errors"].items():
-        out.append("        crate::error::Error::%s => %d, // %s\n" % (name, e["errno"], e["c"]))
+        out.append("        crate::error::Error::%s => %d, // %s\n"
+                   % (name, doc["errno_table"][e["c"]], e["c"]))
     out.append("    }\n}\n")
     return "".join(out)
 
@@ -194,12 +195,26 @@ def render_libsys_errno(doc):
     out = ["\n// ---------- Error <-> errno（双向） ----------\n\n"]
     out.append("pub const fn to_errno(e: crate::error::Error) -> i32 {\n    match e {\n")
     for name, e in doc["errors"].items():
-        out.append("        crate::error::Error::%s => %d, // %s\n" % (name, e["errno"], e["c"]))
+        out.append("        crate::error::Error::%s => %d, // %s\n"
+                   % (name, doc["errno_table"][e["c"]], e["c"]))
     out.append("        crate::error::Error::Unknown(e) => e,\n    }\n}\n\n")
     out.append("pub const fn from_errno(e: i32) -> crate::error::Error {\n    match e {\n")
     for name, e in doc["errors"].items():
-        out.append("        %d => crate::error::Error::%s, // %s\n" % (e["errno"], name, e["c"]))
+        out.append("        %d => crate::error::Error::%s, // %s\n"
+                   % (doc["errno_table"][e["c"]], name, e["c"]))
     out.append("        other => crate::error::Error::Unknown(other),\n    }\n}\n")
+    return "".join(out)
+
+
+def render_libc_errno(doc):
+    """libc 的 134 个 errno 常量（C 头与 Rust 两侧同一事实源）。
+
+    **方向说明**：这一族的"事实源"是 tools/abi/constants.json 的 errno_table，
+    由它同时产出 errno.h 的 #define 行（整行重写）与 Rust 常量。
+    """
+    out = ["\n// ---------- errno（与 <errno.h> 同一事实源） ----------\n\n"]
+    for name, val in doc["errno_table"].items():
+        out.append("pub const %s: i32 = %d;\n" % (name, val))
     return "".join(out)
 
 
@@ -221,6 +236,28 @@ LINE_TARGETS = (
 )
 
 
+# **多行目标**：一个文件里的一批 #define 的值由生成器同步（文件名 + JSON 里的表名）。
+# 与 LINE_TARGETS 同一理由：头文件前后有大量手写说明，只改**值**，不动结构。
+DEFINE_TARGETS = (
+    ("libc:errno.h", os.path.join(ROOT, "libc", "include", "errno.h"), "errno_table"),
+)
+
+
+def sync_defines(path, table):
+    """返回 (新文本, [(名字, 现值, 期望值)])——现值与期望值不同的都记下来。"""
+    txt = open(path, encoding="utf-8", newline="").read()
+    bad = []
+    for name, val in table.items():
+        m = re.search(r"(#\s*define\s+" + name + r"\s+)(-?\d+)([^\n]*)", txt)
+        if not m:
+            bad.append((name, None, val))
+            continue
+        if int(m.group(2)) != val:
+            bad.append((name, m.group(2), val))
+            txt = txt[:m.start()] + m.group(1) + str(val) + m.group(3) + txt[m.end():]
+    return txt, bad
+
+
 GEN_FILES = (
     ("kernel:kernel", K_SYSCALL_GEN,
      lambda doc: render_syscalls(doc, "crate::syscall::domain", "crate::syscall::op")
@@ -234,7 +271,7 @@ GEN_FILES = (
      + render_libsys_paths(doc) + render_libsys_tokens(doc)),
     ("libc", LIBC_GEN, lambda doc: HEADER.replace("@SRC@", SRC_REL)
      + "use crate::ctypes::{c_int, c_long};\n" + render_values(doc, LIBC_VALUES)
-     + render_libc_tokens(doc)),
+     + render_libc_tokens(doc) + render_libc_errno(doc)),
     ("tools:generated.py", TOOLS_GEN, render_python_tokens),
     ("shell:abi", SHELL_GEN, render_shell_tokens),
 )
@@ -270,6 +307,8 @@ VALUE_HARDCODED = (
     ("tools/tools_build/b3p.py", r'THIRD_PARTY_SUBDIR = "3p"'),
     ("shell/src/env.rs", r'b"/programs:/volumes/BORUIX_DATA/3p"'),
     ("init/src/main.rs", r'"/volumes/BORUIX_DATA/welcome\.txt"'),
+    # libc 的 errno：134 个常量现在由 errno_table 生成，errno.rs 不得再写死
+    ("libc/src/errno.rs", r"pub const E[A-Z0-9_]+: i32 = \d+;"),
 )
 
 
@@ -335,6 +374,18 @@ def main():
                       % (label, path, m.group(0), want))
                 ok = False
 
+    # 多行目标（头文件里的一批 #define 值）
+    for label, path, table in DEFINE_TARGETS:
+        txt, bad = sync_defines(path, doc[table])
+        if a.write:
+            if bad:
+                open(path, "w", encoding="utf-8", newline="").write(txt)
+                print("[abi-gen] %-14s 同步 %d 处 %s" % (label, len(bad), os.path.relpath(path, ROOT)))
+        else:
+            for name, cur, want in bad:
+                print("[abi-gen] FAIL %s：%s 实为 %s，应为 %s" % (label, name, cur, want))
+                ok = False
+
     if a.write:
         return 0
 
@@ -382,20 +433,11 @@ def main():
             print("[abi-gen] FAIL %s 里仍有写死的数值：%s" % (rel, m.group(0)))
             ok = False
 
-    hdr = open(LIBC_ERRNO_H, encoding="utf-8").read()
-    rs = open(LIBC_ERRNO_RS, encoding="utf-8").read()
-    for name, e in doc["errors"].items():
-        c, num = e["c"], e["errno"]
-        mh = re.search(r"#\s*define\s+" + c + r"\s+(\d+)", hdr)
-        mr = re.search(r"pub const " + c + r"\s*:\s*i32\s*=\s*(\d+)\s*;", rs)
-        if not mh or int(mh.group(1)) != num:
-            print("[abi-gen] FAIL libc/include/errno.h：%s（%s）应为 %d，实为 %s"
-                  % (c, name, num, mh.group(1) if mh else "缺失"))
-            ok = False
-        if not mr or int(mr.group(1)) != num:
-            print("[abi-gen] FAIL libc/src/errno.rs：%s（%s）应为 %d，实为 %s"
-                  % (c, name, num, mr.group(1) if mr else "缺失"))
-            ok = False
+    # 注：libc 的 errno.h / errno.rs 与 errno_table 的一致性**已由上面两条覆盖**——
+    #   · errno.h 的 134 个 #define 值由 DEFINE_TARGETS 逐行核对；
+    #   · errno.rs 的常量由 render_libc_errno 生成（生成物新鲜度由 GEN_FILES 核对）。
+    # 原先那段"kernel Error <-> libc ENOENT"的交叉核对因此成为**结构性成立**，
+    # 不再是两条独立手写映射的巧合。
 
     if ok:
         print("[abi-gen] OK：%d 份生成物与 JSON 一致；手写 domain/op 一致；errno 映射已委托；"
