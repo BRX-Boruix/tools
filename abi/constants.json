@@ -554,7 +554,7 @@
     },
     "CLOCKS_PER_SEC": {
       "ty": "clock_t",
-      "v": 1000000000,
+      "v": 1000000,
       "fmt": "dec"
     },
     "CLOCK_MONOTONIC": {
