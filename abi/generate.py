@@ -181,6 +181,25 @@ def render_syscalls(doc, dom_path, op_path):
     return "".join(out)
 
 
+def render_wire(doc):
+    """跨边界 wire 常量（内核 <-> libsys）——两侧**同一事实源**。
+
+    此前这些是"两侧各手写一份 + 注释互指"（S13 的说法），实测 2026-10-15：
+    扰动 SIGINT / EVENT_RECORD_SIZE / NICE_BIAS，generate.py 与 abi_mirrors_agree
+    **两个工具都不报** —— 注释互指不是机制。现由 JSON 的 wire 段生成，两侧引用。
+
+    `1 << N` 与 `A | B` 这类形态**原样保留**（"第几位"与组合关系是有信息的，
+    折成裸数字会丢掉它们）；纯整数字面量也按原样输出。
+    """
+    out = ["\n// ---------- 跨边界 wire 常量（内核 <-> libsys） ----------\n\n"]
+    for name, e in doc["wire"].items():
+        if name.startswith("_"):
+            continue
+        rhs = e["expr"] if "expr" in e else str(e["v"])
+        out.append("pub const %s: %s = %s;\n" % (name, e["ty"], rhs))
+    return "".join(out)
+
+
 def render_kernel_errno(doc):
     out = [HEADER.replace("@SRC@", SRC_REL), "// ---------- Error -> errno ----------\n\n"]
     out.append("pub const fn to_errno(e: crate::error::Error) -> i32 {\n    match e {\n")
@@ -393,13 +412,13 @@ GEN_FILES = (
     ("kernel:kernel", K_SYSCALL_GEN,
      lambda doc: render_syscalls(doc, "crate::syscall::domain", "crate::syscall::op")
      + render_values(doc, KERNEL_VALUES)),
-    ("kernel:klib", K_KLIB_GEN, render_kernel_errno),
+    ("kernel:klib", K_KLIB_GEN, lambda doc: render_kernel_errno(doc) + render_wire(doc)),
     ("kernel:vfs", K_VFS_GEN, lambda doc: HEADER.replace("@SRC@", SRC_REL) + render_values(doc, VFS_VALUES) + render_kernel_path_names(doc)),
     ("kernel:ipc", K_IPC_GEN, lambda doc: HEADER.replace("@SRC@", SRC_REL) + render_values(doc, IPC_VALUES)),
     ("libsys", L_GEN,
      lambda doc: render_syscalls(doc, "crate::nr::domain", "crate::nr::op")
      + render_libsys_errno(doc) + render_values(doc, LIBSYS_VALUES)
-     + render_libsys_paths(doc) + render_libsys_tokens(doc)),
+     + render_libsys_paths(doc) + render_libsys_tokens(doc) + render_wire(doc)),
     ("libc", LIBC_GEN, lambda doc: HEADER.replace("@SRC@", SRC_REL)
      + libc_type_imports(doc) + render_values(doc, LIBC_VALUES)
      + render_libc_tokens(doc) + render_libc_errno(doc) + render_libc_c_consts(doc)),
@@ -536,6 +555,27 @@ def main():
                 print("[abi-gen] FAIL %s 里仍在定义已生成的常量 %s（应改为 use crate::abi_generated::%s）"
                       % (os.path.relpath(path, ROOT), m.group(1), m.group(1)))
                 ok = False
+
+    # 跨边界 wire 常量：手写站点必须引用生成物，不得再出现字面量。
+    # 与 abi_mirrors_agree 第 10 类**同一判据**——两个工具必须结论一致
+    # （第八阶段踩过：两个工具清单不一致时，只跑一个会得出"没问题"）。
+    # 实测价值：本检查刚上线就抓到一处**第三份拷贝**
+    # （kernel/crates/vfs/src/stream.rs 的 EVENT_RECORD_SIZE = 16）。
+    wire_names = {k for k in doc["wire"] if not k.startswith("_")}
+    for base in ("kernel/crates", "libsys/src"):
+        for dp, dn, fns in os.walk(os.path.join(ROOT, base)):
+            dn[:] = [x for x in dn if x not in (".git", "target")]
+            for fn in sorted(fns):
+                if not fn.endswith(".rs") or fn == "abi_generated.rs":
+                    continue
+                path = os.path.join(dp, fn)
+                txt = open(path, encoding="utf-8").read()
+                for m in re.finditer(r"pub const ([A-Za-z_][A-Za-z0-9_]*)\s*:\s*[^=;]+?=\s*([^;]+);", txt):
+                    if m.group(1) in wire_names and "abi_generated::" not in m.group(2):
+                        print("[abi-gen] FAIL %s:%d 仍在写死 wire 常量 %s = %s（应引用生成物）"
+                              % (os.path.relpath(path, ROOT), txt[:m.start()].count("\n") + 1,
+                                 m.group(1), m.group(2).strip()[:30]))
+                        ok = False
 
     # C 头里 c_consts 的值
     bad = sync_c_consts(doc, a.write)

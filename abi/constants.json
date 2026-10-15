@@ -1253,5 +1253,224 @@
       "v": 1,
       "fmt": "dec"
     }
+  },
+  "wire": {
+    "_": "跨边界 wire 常量：内核 <-> libsys 两侧必须逐字节一致。此前两侧各手写一份 + 注释互指；实测 2026-10-15：扰动 SIGINT / EVENT_RECORD_SIZE / NICE_BIAS，generate.py 与 abi_mirrors_agree 两个工具**都不报**——即无门禁。现收进单一事实源并由两侧引用。",
+    "ACE_PRINCIPAL_NAMED_GID": {
+      "v": 2,
+      "ty": "u32"
+    },
+    "ACE_PRINCIPAL_NAMED_UID": {
+      "v": 1,
+      "ty": "u32"
+    },
+    "ACE_PRINCIPAL_OTHER": {
+      "v": 3,
+      "ty": "u32"
+    },
+    "ACE_PRINCIPAL_OWNER": {
+      "v": 0,
+      "ty": "u32"
+    },
+    "ACE_WIRE_MAX": {
+      "v": 64,
+      "ty": "usize"
+    },
+    "ACE_WIRE_SIZE": {
+      "v": 24,
+      "ty": "usize"
+    },
+    "AT_EXECFN": {
+      "v": 31,
+      "ty": "u64"
+    },
+    "AT_NULL": {
+      "v": 0,
+      "ty": "u64"
+    },
+    "DERIVE_FLAGS_NONE": {
+      "v": 0,
+      "ty": "u64"
+    },
+    "ENTRY_KIND_DIRECTORY": {
+      "v": 0,
+      "ty": "u64"
+    },
+    "ENTRY_KIND_FILE": {
+      "v": 1,
+      "ty": "u64"
+    },
+    "ENTRY_READ_ACES": {
+      "v": 2,
+      "ty": "u64"
+    },
+    "ENTRY_READ_READDIR": {
+      "v": 0,
+      "ty": "u64"
+    },
+    "ENTRY_READ_STAT": {
+      "v": 1,
+      "ty": "u64"
+    },
+    "ENTRY_UPDATE_CHMOD": {
+      "v": 1,
+      "ty": "u64"
+    },
+    "ENTRY_UPDATE_CHOWN": {
+      "v": 2,
+      "ty": "u64"
+    },
+    "ENTRY_UPDATE_RENAME": {
+      "v": 0,
+      "ty": "u64"
+    },
+    "ENTRY_UPDATE_SET_ACES": {
+      "v": 3,
+      "ty": "u64"
+    },
+    "EVENT_FLAG_E0": {
+      "expr": "1 << 0",
+      "ty": "u8"
+    },
+    "EVENT_FLAG_NO_TIME": {
+      "expr": "1 << 1",
+      "ty": "u8"
+    },
+    "EVENT_KIND_KEY_DOWN": {
+      "v": 1,
+      "ty": "u8"
+    },
+    "EVENT_KIND_KEY_UP": {
+      "v": 2,
+      "ty": "u8"
+    },
+    "EVENT_RECORD_SIZE": {
+      "v": 16,
+      "ty": "usize"
+    },
+    "GATE_SYSTEM_BIT": {
+      "expr": "1 << 9",
+      "ty": "u32"
+    },
+    "GROUPS_SET_CLEAR": {
+      "v": 1,
+      "ty": "u64"
+    },
+    "GROUPS_SET_REPLACE": {
+      "v": 0,
+      "ty": "u64"
+    },
+    "GROUPS_SET_RESERVED_NONE": {
+      "v": 0,
+      "ty": "u64"
+    },
+    "IDENTITY_SET_RESERVED_NONE": {
+      "v": 0,
+      "ty": "u64"
+    },
+    "MAX_CMDLINE_BYTES": {
+      "v": 4096,
+      "ty": "usize"
+    },
+    "MAX_ENV_COUNT": {
+      "v": 64,
+      "ty": "usize"
+    },
+    "MEM_MAP_SHARED": {
+      "expr": "1 << 0",
+      "ty": "u64"
+    },
+    "NICE_BIAS": {
+      "v": 20,
+      "ty": "i32"
+    },
+    "NICE_GET": {
+      "v": 0,
+      "ty": "u64"
+    },
+    "NICE_SET": {
+      "v": 1,
+      "ty": "u64"
+    },
+    "PROT_DEFAULT": {
+      "expr": "PROT_READ | PROT_WRITE",
+      "ty": "u64"
+    },
+    "PROT_EXEC": {
+      "expr": "1 << 2",
+      "ty": "u64"
+    },
+    "PROT_READ": {
+      "expr": "1 << 0",
+      "ty": "u64"
+    },
+    "PROT_WRITE": {
+      "expr": "1 << 1",
+      "ty": "u64"
+    },
+    "SIGALRM": {
+      "v": 14,
+      "ty": "u32"
+    },
+    "SIGBUS": {
+      "v": 7,
+      "ty": "u32"
+    },
+    "SIGCHLD": {
+      "v": 17,
+      "ty": "u32"
+    },
+    "SIGCONT": {
+      "v": 18,
+      "ty": "u32"
+    },
+    "SIGFPE": {
+      "v": 8,
+      "ty": "u32"
+    },
+    "SIGILL": {
+      "v": 4,
+      "ty": "u32"
+    },
+    "SIGINT": {
+      "v": 2,
+      "ty": "u32"
+    },
+    "SIGKILL": {
+      "v": 9,
+      "ty": "u32"
+    },
+    "SIGPIPE": {
+      "v": 13,
+      "ty": "u32"
+    },
+    "SIGSEGV": {
+      "v": 11,
+      "ty": "u32"
+    },
+    "SIGSTOP": {
+      "v": 19,
+      "ty": "u32"
+    },
+    "SIGTERM": {
+      "v": 15,
+      "ty": "u32"
+    },
+    "SIGUSR1": {
+      "v": 10,
+      "ty": "u32"
+    },
+    "SIGUSR2": {
+      "v": 12,
+      "ty": "u32"
+    },
+    "STREAM_READ_NONBLOCK": {
+      "v": 1,
+      "ty": "u64"
+    },
+    "STREAM_READ_PEEK": {
+      "v": 2,
+      "ty": "u64"
+    }
   }
 }

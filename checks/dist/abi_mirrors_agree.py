@@ -819,6 +819,54 @@ def check_struct_widths():
     return ok
 
 
+# ---------- 10. 跨边界 wire 常量（内核 <-> libsys） ----------
+#
+# 54 项：信号号 / `PROT_*` / `AT_*` / `EVENT_*` / `ACE_*` / syscall 动词 / 限制值。
+# 此前是"两侧各手写一份 + 注释互指（S13）"。**实测 2026-10-15**：把 libsys 的
+# `SIGINT` 从 2 改成 3、`EVENT_RECORD_SIZE` 从 16 改成 17、`NICE_BIAS` 从 20 改成 21，
+# `generate.py` 与 `abi_mirrors_agree` **两个工具都不报** —— 注释互指不是机制。
+#
+# 现在值由 JSON 的 wire 段生成，本类做**接线核对**：
+#   (a) 两侧生成物里必须有这个名字；
+#   (b) 手写站点必须引用生成物，不得再出现字面量。
+
+K_WIRE_GEN = os.path.join("kernel", "crates", "klib", "src", "abi_generated.rs")
+L_WIRE_GEN = os.path.join("libsys", "src", "abi_generated.rs")
+
+
+def check_wire_consts():
+    import json as _json
+    with open(os.path.join(ROOT, ABI_JSON), encoding="utf-8") as fh:
+        wire = _json.load(fh)["wire"]
+    names = {k: v for k, v in wire.items() if not k.startswith("_")}
+    ok = True
+    for rel in (K_WIRE_GEN, L_WIRE_GEN):
+        txt = open(os.path.join(ROOT, rel), encoding="utf-8").read()
+        missing = [n for n in sorted(names) if not re.search(r"pub const %s\s*:" % re.escape(n), txt)]
+        if missing:
+            print("  FAIL %s 缺 %d 项：%s" % (rel, len(missing), missing[:5]))
+            ok = False
+    bad = []
+    for base in ("kernel/crates", "libsys/src"):
+        for pp in walk(os.path.join(ROOT, base), ".rs"):
+            r = os.path.relpath(pp, ROOT)
+            if r.endswith("abi_generated.rs"):
+                continue
+            txt = open(pp, encoding="utf-8").read()
+            for m in re.finditer(r"pub const ([A-Za-z_][A-Za-z0-9_]*)\s*:\s*[^=;]+?=\s*([^;]+);", txt):
+                n = m.group(1)
+                if n not in names:
+                    continue
+                if "abi_generated::" not in m.group(2):
+                    bad.append((r, n, m.group(2).strip(), txt[:m.start()].count("\n") + 1))
+    for r, n, v, ln in bad[:10]:
+        print("  FAIL %s:%d 仍在写死 %s = %s（应引用生成物）" % (r, ln, n, v[:30]))
+    if bad:
+        ok = False
+    print("[abi-mirror] 跨边界 wire 常量：**%d 项**两侧均引用生成物、无字面量" % len(names))
+    return ok
+
+
 def main():
     results = [
         ("syscall 号", check_syscall_table()),
@@ -830,6 +878,7 @@ def main():
         ("单 token 契约", check_token_contracts()),
         ("单点字面量", check_single_literal()),
         ("结构体字段宽度", check_struct_widths()),
+        ("跨边界 wire", check_wire_consts()),
     ]
     failed = [n for n, ok in results if not ok]
     if failed:
