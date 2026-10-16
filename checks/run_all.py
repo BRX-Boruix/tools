@@ -27,6 +27,17 @@ HARDWARE_CHECKS = ()
 # 不靠"自动发现"：自动发现会让"改名后静默少跑"无法察觉。
 OFFLINE_CHECKS = (
     "checks/regression/run_all_selftest.py",
+    # 内核自检代码（tests.rs）只在 kernel-tests feature 下参与编译 ⇒ 默认构建与其它
+    # 离线检查都看不到它。本项**编译一次带自检的内核**把它纳入门禁：
+    # 实测（2026-10-16）登记项⑤ 改了 MountTable::unlink 签名后 43 处测试调用点没跟上，
+    # 潜伏数轮才被 30 分钟的 --test 抓到——本项用编译即可当场发现。
+    # **代价**：一次 cargo 构建（热 target 下约 1-3 分钟），比同列其它项慢。
+    "checks/regression/kernel_tests_build.py",
+    # 变异反向验证的「还原」是手工步骤 ⇒ 残留一次就把**被故意改坏**的实现提交进仓库。
+    # 实测（2026-10-16）：登记项⑩ 的变异标记就漏还原并被提交，而当时的机内跑测是绿的
+    # （绿跑在变异之前）。本项用一次全树扫描杜绝；顺带扫审查脚本的反引号/空字节占位符残留
+    # （审查脚本的反引号/空字节占位符）。
+    "checks/regression/no_mutation_markers.py",
     "checks/regression/config_paths_selftest.py",
     "checks/regression/iso9660_selftest.py",
     "checks/regression/elf_image_selftest.py",
