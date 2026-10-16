@@ -1271,6 +1271,16 @@
       "v": 83,
       "fmt": "dec"
     },
+    "_SC_CLK_TCK": {
+      "ty": "c_int",
+      "v": 2,
+      "fmt": "dec"
+    },
+    "_SC_OPEN_MAX": {
+      "ty": "c_int",
+      "v": 4,
+      "fmt": "dec"
+    },
     "no_argument": {
       "ty": "c_int",
       "v": 0,
@@ -1403,6 +1413,10 @@
     },
     "MAX_CMDLINE_BYTES": {
       "v": 4096,
+      "ty": "usize"
+    },
+    "MAX_FDS": {
+      "v": 1024,
       "ty": "usize"
     },
     "MAX_ENV_COUNT": {
