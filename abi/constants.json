@@ -220,6 +220,10 @@
       "domain": "STREAM",
       "op": "READ"
     },
+    "SYS_STREAM_SEEK": {
+      "domain": "STREAM",
+      "op": 13
+    },
     "SYS_STREAM_WRITE": {
       "domain": "STREAM",
       "op": "WRITE"
