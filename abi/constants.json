@@ -396,6 +396,9 @@
     },
     "NoChild": {
       "c": "ECHILD"
+    },
+    "NotPermitted": {
+      "c": "EPERM"
     }
   },
   "values": {
