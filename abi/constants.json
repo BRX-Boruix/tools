@@ -1241,6 +1241,36 @@
       "v": 84,
       "fmt": "dec"
     },
+    "_SC_ARG_MAX": {
+      "ty": "c_int",
+      "v": 0,
+      "fmt": "dec"
+    },
+    "_SC_VERSION": {
+      "ty": "c_int",
+      "v": 29,
+      "fmt": "dec"
+    },
+    "_SC_2_VERSION": {
+      "ty": "c_int",
+      "v": 46,
+      "fmt": "dec"
+    },
+    "_SC_PAGESIZE": {
+      "ty": "c_int",
+      "v": 30,
+      "fmt": "dec"
+    },
+    "_SC_PAGE_SIZE": {
+      "ty": "c_int",
+      "v": 30,
+      "fmt": "dec"
+    },
+    "_SC_NPROCESSORS_CONF": {
+      "ty": "c_int",
+      "v": 83,
+      "fmt": "dec"
+    },
     "no_argument": {
       "ty": "c_int",
       "v": 0,
