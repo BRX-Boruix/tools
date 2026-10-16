@@ -393,6 +393,9 @@
     },
     "BadFd": {
       "c": "EBADF"
+    },
+    "NoChild": {
+      "c": "ECHILD"
     }
   },
   "values": {
