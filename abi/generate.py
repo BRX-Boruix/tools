@@ -91,32 +91,22 @@ def render_values(doc, entries):
 
 
 def token_values(doc):
-    """tokens 节的取值。**只导出「系统约定」，不导出「部署事实」。**
+    """tokens 节的取值。**只导出「系统契约」；其余留在 Python 侧。**
 
-    三类东西必须分清（这是本轮改动的全部理由）：
+    三类东西必须分清：
 
-    - **系统约定**：`PROGRAM_DIR`（`/programs`）、`THIRD_PARTY_SUBDIR`（`3p`）——由系统自己规定，
-      任何部署都一样 ⇒ 编译期常量，正确。
-    - **部署事实**：**卷标**、**有几块盘**、**`3p` 在哪块盘上**——由用户的实际磁盘决定 ⇒
-      **不能**编译期烧死。把 `/volumes/<某个卷标>/3p` 烧进二进制，等于假定用户用的就是
-      作者那块盘；真实运行下卷标可能不同、可能根本没有第二块盘、`3p` 也可能在系统盘上。
-      那样烧出来的 `PATH` / `_CS_PATH` 会指向**不存在的目录**，且没有任何地方会报错。
-      故这些路径改由 `libsys::volume::search_path()` 在运行期从**真实挂载点**算出。
-    - **构建工具默认值**：`DATA_VOLUME_LABEL` 仍是 `mkimg` 的默认卷标——那是**构建期**的选择，
-      与运行期无关，保留。
+    - **系统契约**：`PROGRAM_DIR`（`/programs`）——系统自己规定的约定路径，任何部署都一样。
+      这是**唯一**生成进 Rust 的 token。
+    - **Python 侧的取值**：`DATA_VOLUME_LABEL`（`mkimg` 的默认卷标）、`THIRD_PARTY_SUBDIR`
+      （`3p` 子目录名）。它们描述**盘上的数据**，只供 tools 的 Python 用，**不生成进 Rust**。
+    - **部署事实**（卷标的具体值、有几块盘、盘挂在哪个挂载点）：**任何地方都不编译期烧死**。
+      系统运行时从 `/volumes` 的目录项读；Python 侧要用就按自己造的盘去算。
     """
     t = doc["tokens"]
-    label = t["DATA_VOLUME_LABEL"]
     return {
         "PROGRAM_DIR": t["PROGRAM_DIR"],
         "THIRD_PARTY_SUBDIR": t["THIRD_PARTY_SUBDIR"],
         "DATA_VOLUME_LABEL": t["DATA_VOLUME_LABEL"],
-        # **已知残留（同一族的最后一处）**：tcc 的 `CONFIG_TCCDIR` 只能编译期定死
-        # （`-B` 能运行期覆盖，但系统里没有 wrapper 去传它，tcc 也不读 libpath 环境变量）。
-        # 故它仍由卷标派生 ⇒ 换卷标时 tcc 找不到自己的 include/lib。
-        # 真正的修法是「tcc 从 argv[0] 推导自己的目录」或「系统给一个 -B wrapper」，
-        # 两者都要动 tcc 仓/分发形态，已登记待办（见 docs/TODO/3p.md）。
-        "TCC_DIR": "/volumes/" + label + "/" + t["THIRD_PARTY_SUBDIR"] + "/tcc",
     }
 
 
@@ -137,10 +127,10 @@ def render_python_tokens(doc):
 
 def render_libsys_tokens(doc):
     v = token_values(doc)
-    out = ["\n// ---------- 系统标识 token（**只有系统约定**；部署事实在运行期发现） ----------\n\n"]
-    # 卷标 / 有几块盘 / 3p 在哪块盘上都是**部署事实**，不在此导出——由
-    # libsys::volume::search_path() 从 /volumes 的真实挂载点算出。
-    for k in ("PROGRAM_DIR", "THIRD_PARTY_SUBDIR", "DATA_VOLUME_LABEL"):
+    out = ["\n// ---------- 系统标识 token（**只有系统契约**） ----------\n\n"]
+    # 只导出 PROGRAM_DIR。卷标 / 盘数 / 3p 子目录名都是**数据**，系统不需要知道——
+    # 系统对它们的全部认知是「有一块卷，挂载点 /volumes/<它自己的卷标>」，那是运行时读出来的。
+    for k in ("PROGRAM_DIR",):
         out.append('pub const %s: &str = "%s";\n' % (k, v[k]))
     return "".join(out)
 
@@ -322,11 +312,11 @@ def render_libc_errno(doc):
 
 # **整行生成**：C 头文件里的一行由生成器重写（`#define` 前后还有大量手写说明，
 # 不适合整文件生成）。判据：该行必须与生成结果**逐字节相同**。
-C_CONFIG_H = os.path.join(ROOT, "tcc-on-boruix", "boruix", "config.h")
-LINE_TARGETS = (
-    ("tcc:CONFIG_TCCDIR", C_CONFIG_H, r'#define CONFIG_TCCDIR "[^"]*"',
-     lambda doc: '#define CONFIG_TCCDIR "%s"' % token_values(doc)["TCC_DIR"]),
-)
+#
+# **当前为空**：原先这里生成 tcc 的 `CONFIG_TCCDIR`（= `/volumes/<卷标>/3p/tcc`）。
+# 那是**盘上的位置**，属于数据，不该由生成器写死；tcc 改为在启动时按 `argv[0]` 推导自己的
+# 目录（见 tcc-on-boruix 的 UPSTREAM-PATCHES）。生成器不再管它。
+LINE_TARGETS = ()
 
 
 # **多行目标**：一个文件里的一批 #define 的值由生成器同步（文件名 + JSON 里的表名）。

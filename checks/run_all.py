@@ -59,7 +59,10 @@ OFFLINE_CHECKS = (
     "checks/regression/tool_resolution_selftest.py",
     "checks/regression/abi_exports_selftest.py",
     # 发行物门禁：本项**自足**（只读仓库内两处源码做一致性核对），故登记。
-    "checks/dist/confstr_path_agrees.py",
+    # 系统（Rust）不许知道任何盘的名字/盘上的路径——_CS_PATH 与 shell 默认 PATH 都走
+    # PROGRAM_DIR（系统契约）。本项取代了原来的 confstr_path_agrees（它只比两侧字面量，
+    # 两侧同错时永远绿）。
+    "checks/dist/no_disk_in_system.py",
     # 跨边界镜像常量门禁（syscall 号 / 错误码 / C 头常量 / 路径契约），同样自足。
     "checks/dist/abi_mirrors_agree.py",
     # 跨边界常量的**单一事实源**（tools/abi/constants.json）与两侧生成物的一致性。
