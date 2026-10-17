@@ -1,9 +1,10 @@
-"""BORUIX_TESTDISK：**测试专用**盘，由 Python 侧现场生成。
+"""BORUIX_TESTDISK：**测试专用**盘，由 Python 侧现场编译夹具生成。
 
 ## 它是什么 / 不是什么
 
-- **是**：测试夹具的载体。夹具源码**写在本文件里**，编译后写进镜像——测试因此自足，
-  不依赖 `tools/diskfiles/`（那是给人类维护的**数据盘**内容，两块盘互不知道）。
+- **是**：测试夹具的载体。夹具源码在 `tools/testdisk/`（本模块所在的仓里），
+  由本模块用 sysroot 的 `boruix-clang` 编译后写进镜像——测试因此自足。
+- **不是**：数据盘的附属。它**不读** `tools/diskfiles/`（那是数据盘的内容），两块盘互不知道。
 - **不是**：系统概念。系统不知道这块盘存在、也不知道它叫什么；对它来说这只是
   「一块卷，挂载点 `/volumes/<它自己的卷标>`」。
 
@@ -17,8 +18,6 @@
     python tools/main.py build --testdisk     # 只生成 testdisk.img
     python tools/main.py run   --testdisk     # 只挂载（要求镜像已存在）
     python tools/main.py br    --testdisk     # 生成并挂载
-
-镜像里**只有本文件里写的夹具**，与 `disk.img` 无任何交集。
 """
 
 import os
@@ -36,41 +35,37 @@ LABEL = "BORUIX_TESTDISK"
 #: 镜像路径（与数据盘 `disk.img` 并列、互不覆盖）。
 IMG_PATH = os.path.join(config.PROJECT_ROOT, "testdisk.img")
 
-#: 夹具源码。**写在这里**而不是从 `diskfiles/` 读——测试盘必须自足，
-#: 且不能与人类维护的数据盘内容耦合。键是产物名，值是 C 源码。
-FIXTURES = {
-    "tdhello": r"""
-#include <stdio.h>
-int main(void)
-{
-    puts("hello from the test disk");
-    return 0;
-}
-""",
-    "tdexit": r"""
-/* 退出码夹具：让测试能断言「盘上的程序确实被执行了」，而不只是挂上了。 */
-int main(void)
-{
-    return 42;
-}
-""",
+#: 夹具源码目录（本仓内，**不是** diskfiles/）。
+SRC_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "testdisk")
+
+#: 要编进镜像的夹具（文件名去掉 .c）。**显式清单**，不扫目录——
+#: 扫目录会让「新增一个文件」静默改变镜像内容，且无法表达「这个文件不参与」。
+FIXTURES = (
+    "cc1-smoke", "ctor_check", "dircount", "dlfcn_hdr_check", "forkmin", "forkrace",
+    "fsbench", "fswcmd", "fswrite", "heapstress", "hello_cc1", "jitprobe",
+    "mathclass_check", "mkfiles", "mode_umask_check", "readbench", "setvbuf_check",
+    "surface7_check", "syscallfuzz", "tiny", "wave2",
+)
+
+#: 目录里存在但**不编进镜像**的，以及为什么。
+NOT_ON_DISK = {
+    # 实测（2026-10-17）：它引用的 dlopen/dlsym/dlclose 由 **rtld** 提供，不在 libc.a 里；
+    # 普通 boruix-clang 链接会失败（必须带 --unresolved-symbols 并交给 rtld 装载）。
+    "dlclose_check": "dl* 由 rtld 提供，boruix-clang 链不上（需 rtld 装载）",
+    "pad_equiv": "宿主侧等价性测试（在宿主上编译运行，与机内无关）",
 }
 
 
 def _clang(sysroot):
     p = os.path.join(sysroot, "bin", "boruix-clang")
-    if not os.path.isfile(p):
-        return None
-    return p
+    return p if os.path.isfile(p) else None
 
 
 def generate(sysroot=None):
     """生成 testdisk.img。返回 0 = 成功。
 
-    步骤：把 FIXTURES 的源码写到临时目录 → 用 sysroot 的 `boruix-clang` 逐个编译 →
-    把产物放进 staging 目录 → 交给 disk.create_ext2_disk_image 打成 ext2 镜像。
-
-    盘里**不放** `diskfiles/` 的任何内容：两块盘互不知道。
+    把 `tools/testdisk/` 的夹具逐个用 sysroot 的 `boruix-clang` 编译，产物放进 staging，
+    再交给 disk.create_ext2_disk_image 打成 ext2 镜像。
     """
     sysroot = sysroot or os.environ.get("BORUIX_SYSROOT")
     if not sysroot:
@@ -85,25 +80,25 @@ def generate(sysroot=None):
     stage = os.path.join(work, "stage")
     os.makedirs(stage)
     try:
-        for name, src in FIXTURES.items():
-            cpath = os.path.join(work, name + ".c")
-            with open(cpath, "w", encoding="utf-8", newline="\n") as f:
-                f.write(src.lstrip("\n"))
+        for name in FIXTURES:
+            cpath = os.path.join(SRC_DIR, name + ".c")
+            if not os.path.isfile(cpath):
+                err("testdisk: 缺夹具源码 " + cpath)
+                return 1
             out = os.path.join(stage, name + ".elf")
-            info("testdisk: 编译 " + name + ".c")
             # boruix-clang 是 **Python 脚本**（不是原生 exe），必须用当前解释器跑——
             # 直接执行会得到 WinError 193（不是有效的 Win32 应用程序）。
             r = subprocess.run([sys.executable, clang, cpath, "-o", out])
             if r.returncode != 0:
                 err("testdisk: 编译失败 " + name)
                 return 1
-        info("testdisk: 写入 " + IMG_PATH + "（卷标 " + LABEL + "）")
+        info("testdisk: 写入 " + IMG_PATH + "（卷标 " + LABEL + "，" + str(len(FIXTURES)) + " 个夹具）")
         if not disk.create_ext2_disk_image(IMG_PATH, label=LABEL, src=stage):
             err("testdisk: 生成镜像失败")
             return 1
     finally:
         shutil.rmtree(work, ignore_errors=True)
-    info("testdisk: 完成（" + str(len(FIXTURES)) + " 个夹具）")
+    info("testdisk: 完成")
     return 0
 
 
