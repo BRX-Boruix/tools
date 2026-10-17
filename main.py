@@ -146,6 +146,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="（已废除，恒走 brxLimine fork，保留以兼容旧脚本）",
     )
+    p_build.add_argument("--testdisk", action="store_true", help="也生成/挂载**测试专用**盘 testdisk.img（内容由 Python 现场编译夹具写入，与数据盘完全独立）"),
     p_build.set_defaults(func=build.cmd)
 
     # run 子命令
@@ -202,6 +203,7 @@ def build_parser() -> argparse.ArgumentParser:
         const=None,
         help="禁用 SMP（单核启动，不传 -smp 给 QEMU）",
     )
+    p_run.add_argument("--testdisk", action="store_true", help="也生成/挂载**测试专用**盘 testdisk.img（内容由 Python 现场编译夹具写入，与数据盘完全独立）"),
     p_run.set_defaults(func=run.cmd)
 
     # br 子命令：Build and Run（先构建，后启动）
@@ -337,6 +339,7 @@ def build_parser() -> argparse.ArgumentParser:
         const=None,
         help="禁用 SMP（单核启动，不传 -smp 给 QEMU）",
     )
+    p_br.add_argument("--testdisk", action="store_true", help="也生成/挂载**测试专用**盘 testdisk.img（内容由 Python 现场编译夹具写入，与数据盘完全独立）"),
     p_br.set_defaults(func=br.cmd)
 
     # mkimg 子命令：创建/格式化物理磁盘镜像

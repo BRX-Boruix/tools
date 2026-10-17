@@ -79,22 +79,27 @@ def _disk_args(buses):
     return out
 
 
-def _disk_topology(args, disk_mode, disk_path, sys_disk):
+def _disk_topology(args, disk_mode, disk_path, sys_disk, test_disk=""):
     """裁决挂哪些盘与各挂到哪条总线，产出完整 QEMU 盘参数。
 
     控制器选择（IDE vs AHCI）与挂哪些盘正交，统一在此裁决，
     避免在每个分支重复写盘参数。
+
+    `test_disk` 非空表示追加**测试专用**盘（`--testdisk`）。它与数据盘完全独立：
+    内容由 tools_build/testdisk.py 现场编译夹具生成，两块盘互不知道。
     """
     ahci = bool(getattr(args, "ahci", False))
     systemdisk = bool(getattr(args, "systemdisk", False))
     with_disk = disk_mode in ("disk", "redisk")
 
-    # 盘序列：系统盘在前（与既有系统盘 -hda 语义一致），数据盘在后。
+    # 盘序列：系统盘在前（与既有系统盘 -hda 语义一致），数据盘次之，测试盘最后。
     planned = []
     if systemdisk:
         planned.append(sys_disk)
     if with_disk:
         planned.append(disk_path)
+    if test_disk:
+        planned.append(test_disk)
 
     if ahci:
         buses = [(p, "ahci." + str(i)) for i, p in enumerate(planned)]
@@ -112,7 +117,7 @@ def cmd(args: argparse.Namespace) -> int:
         err("未找到 " + config.QEMU + "，请在 .env 配置 QEMU_DIR 或加入 PATH")
         return 1
 
-    from . import disk
+    from . import disk, testdisk
     systemdisk = getattr(args, "systemdisk", False)
     disk_path = disk.DISK_IMG_PATH
     # 数据盘策略三选一（main.py 用 mutually exclusive group 保证至多其一）：
@@ -150,8 +155,18 @@ def cmd(args: argparse.Namespace) -> int:
             disk.ensure_disk_image_exists(disk_path, force=(disk_mode == "redisk"))
         boot_order = "d"
 
+    # --testdisk：附带**测试专用**盘。这里只挂载，不生成——生成是 build --testdisk
+    # 的事（br 两者都做）。缺镜像就明确报错，不静默降级成"没插盘"。
+    test_disk = ""
+    if getattr(args, "testdisk", False):
+        if not os.path.isfile(testdisk.IMG_PATH):
+            err("未找到测试盘 " + testdisk.IMG_PATH
+                + "，请先运行 build --testdisk（或 br --testdisk）")
+            return 1
+        test_disk = testdisk.IMG_PATH
+
     # 盘挂载：控制器（IDE/AHCI）与"挂哪些盘"在此统一裁决（单点定义）。
-    disk_args = _disk_topology(args, disk_mode, disk_path, sys_disk)
+    disk_args = _disk_topology(args, disk_mode, disk_path, sys_disk, test_disk)
 
     # 顺序关键：QEMU 按序解析设备，AHCI 控制器须在引用其总线的盘**之前**出现。
     if systemdisk:

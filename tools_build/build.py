@@ -479,4 +479,11 @@ def cmd(args: argparse.Namespace) -> int:
         rc = _make_system_disk(profile)
     else:
         rc = _make_iso(profile)
+    if rc != 0:
+        return rc
+    # --testdisk：生成**测试专用**盘。内容由 tools_build/testdisk.py 现场编译夹具写入，
+    # 与数据盘 disk.img 无任何交集。放在镜像构建成功之后：构建失败不产盘。
+    if getattr(args, "testdisk", False):
+        from . import testdisk
+        rc = testdisk.generate(getattr(args, "sysroot", None))
     return rc
