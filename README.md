@@ -31,7 +31,7 @@ ISO 由内核与引导程序两部分组成。内核经两遍链接：先链接�
 
 ## 验收脚本
 
-`checks/` 下有 24 个验收脚本，按域分类：
+`checks/` 下按域分类登记了一批验收脚本（确切条目见 `checks/run_all.py` 的 `OFFLINE_CHECKS` 注册表）：
 
 - `boot`——开机序列、系统盘安装、终端创建、打字风暴
 - `interactive`——真实按键交互的逐层验证
@@ -55,7 +55,11 @@ tools/
 ├── main.py           # 命令入口
 ├── tools_build/      # 构建与打包实现
 ├── checks/           # 验收脚本，按域分类
+├── abi/              # ABI 常量的单一事实源与生成器
+├── devcheck/         # 开发期验证脚手架（用法见 devcheck/README.md）
 ├── diskfiles/        # 放入数据盘的内容
+├── testdisk/         # 测试盘夹具源码（编译进 testdisk.img）
+├── 3psrc/            # 第三方程序源码
 └── limine.conf       # 引导程序配置
 ```
 
