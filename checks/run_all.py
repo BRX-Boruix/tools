@@ -8,12 +8,25 @@
     python checks/run_all.py              # 跑**离线**检查（秒级）
     python checks/run_all.py --hardware   # 额外跑需要 QEMU 的检查（当前登记表为空）
 
-退出码 0 = 选中的检查**全部**通过；非 0 = 有失败 / 超时 / 文件缺失。
-**空集合不算通过**（"一个都没跑"不是"全绿"）。
+退出码 0 = 选中的检查**全部**通过（且**至少有一项真的跑了**）；非 0 = 有失败 / 超时 / 文件缺失。
+**空集合不算通过**（"一个都没跑"不是"全绿"）；**全被 SKIP 也不算通过**（同理）。
+
+## 三种结局，严格区分（S09：不把「跑不了」混进「通过」）
+
+- `OK`   —— 真跑了，退出码 0；
+- `FAIL` —— 真跑了但非 0，或超时，或登记的文件不存在；
+- `SKIP` —— **前置不满足，根本没跑**。`CHECK_PRECONDITIONS` 里声明的前置由**本 runner 自己探针**
+  （不依赖子检查的退出码），缺了就打印「缺什么」并跳过。
+
+**为什么前置必须由 runner 探针、而不是把子检查的 exit 2 当 SKIP**：退出码 2 是子检查的**内部约定**，
+不同脚本对它的用法并不统一（`headers_syntax.py` 里 2 既表示"缺前置"也表示"没有头文件"）。
+把 2 一律当 SKIP 会把真失败吞成"跳过"。故：**探针说 OK 就必须真跑，非 0 一律 FAIL**——
+若此时子检查仍以 2 退出，说明它的判定与探针不一致，那是**要暴露的缺陷**，不是要抹平的差异。
 """
 
 import argparse
 import os
+import shutil
 import subprocess
 import sys
 
@@ -64,13 +77,62 @@ OFFLINE_CHECKS = (
     # 数学核心的宿主对照验证器（独立 rustc 程序）。此前**存在但没人跑**——
     # 它无论超没超都退 0，故本项解析它自己打印的「超 B 档」列表而不是看退出码。
     "checks/dist/math_verify_runs.py",
-    # 另两项（headers_syntax / tcc_assets_fresh）**未登记**，因为它们需要前置：
-    # 前者要 --sysroot + clang，后者要 --sysroot（`python tools/main.py install --prefix <dir>` 产出）。
-    # 实测（2026-10）：带上 sysroot 后 tcc_assets_fresh 通过（[OK] 磁盘资产与构建产物一致），
-    # headers_syntax 还缺 clang。**登记它们会让本入口在裸环境里恒红**——而 runner 把
-    # 「缺前置（exit 2）」与「失败」都算非 0，混在一起就失去信号。故此处如实不登记，
-    # 并在本节说明它们各自的前置（S09：不把「跑不了」混进「通过」）。
+    # 以下三项**需要前置**（sysroot / clang / llvm-nm），前置在 CHECK_PRECONDITIONS 里声明。
+    # 此前它们**一个都没登记**——理由是「登记会让本入口在裸环境里恒红」，而 runner 把
+    # 「缺前置（exit 2）」与「失败」都算非 0。**那个理由当时成立、根因在 runner 而非这些检查**：
+    # 现在 runner 自己探针前置、缺前置记 SKIP（与 FAIL 严格区分），于是它们可以登记了。
+    # 不登记的真实代价（实测过）：libc 的 POSIX 面基线从 25 漂到 13 而**没有任何门禁报警**，
+    # 只能靠人记得 install 之后手动跑——「忘记跑」在结果上与「通过」无法区分。
+    "../libc/tools/audit_posix_surface.py",   # 需 sysroot + llvm-nm
+    "checks/dist/headers_syntax.py",          # 需 sysroot + clang
+    "checks/dist/tcc_assets_fresh.py",        # 需 sysroot
 )
+
+# 前置声明（**集中一处**，S13）：检查路径 -> 前置名元组。没列在这里的检查 = 无前置。
+#
+# 只登记**探针能如实回答**的前置。探针返回 (ok, 说明)；说明在 SKIP 时原样打印，
+# 让「缺什么、怎么补」当场可见，而不是留一个「跳过」了事。
+CHECK_PRECONDITIONS = {
+    "../libc/tools/audit_posix_surface.py": ("sysroot", "llvm_nm"),
+    "checks/dist/headers_syntax.py": ("sysroot", "clang"),
+    "checks/dist/tcc_assets_fresh.py": ("sysroot",),
+}
+
+
+def _probe_sysroot():
+    """sysroot 探针：env 指向的目录下必须有 lib/libc.a。
+
+    为什么要求 libc.a 而不只是目录存在：三项检查要的都是**已安装的产物**，空的或半装完的
+    sysroot 会让它们以「找不到符号/头文件」的形式报**真失败**，那是误报——前置不满足就该是 SKIP。
+    """
+    sr = os.environ.get("BORUIX_SYSROOT")
+    if not sr:
+        return False, "未设 BORUIX_SYSROOT（先 python tools/main.py install --prefix <dir>）"
+    libc_a = os.path.join(sr, "lib", "libc.a")
+    if not os.path.isfile(libc_a):
+        return False, "BORUIX_SYSROOT 下没有 lib/libc.a：" + sr
+    return True, sr
+
+
+def _probe_clang():
+    c = os.environ.get("BORUIX_CLANG") or shutil.which("clang")
+    if not c:
+        return False, "找不到 clang（设 BORUIX_CLANG 或放进 PATH）"
+    return True, c
+
+
+def _probe_llvm_nm():
+    n = os.environ.get("BORUIX_NM") or shutil.which("llvm-nm")
+    if not n:
+        return False, "找不到 llvm-nm（设 BORUIX_NM 或放进 PATH）"
+    return True, n
+
+
+PRECONDITIONS = {
+    "sysroot": _probe_sysroot,
+    "clang": _probe_clang,
+    "llvm_nm": _probe_llvm_nm,
+}
 
 # 单个检查的超时。超时**算失败**（不能当成 0）。
 CHECK_TIMEOUT_S = 300
@@ -84,22 +146,63 @@ def select(hardware: bool) -> list:
     return chosen
 
 
-def summarize(results) -> int:
-    """把 (路径, 退出码或 None) 汇总成进程退出码。**纯逻辑、宿主可测**。
+# 结局（**三种，严格区分**）：真跑了通过 / 真跑了失败 / 前置不满足没跑。
+OK = "ok"
+FAIL = "fail"
+SKIP = "skip"
 
-    **空集合 -> 非 0**：一个都没跑，不能算"全绿"。
-    退出码为 `None`（超时或文件缺失）**算失败**。
+
+def preconditions_of(relative: str) -> tuple:
+    """该检查声明的前置名（没声明 => 空元组）。**纯逻辑、宿主可测**。"""
+    return CHECK_PRECONDITIONS.get(relative, ())
+
+
+def missing_preconditions(relative: str, probes=None) -> list:
+    """返回**不满足**的前置说明；空列表 = 全部满足。**纯逻辑、宿主可测**。
+
+    `probes` 可注入（测试用），默认取模块级 PRECONDITIONS。
+    """
+    table = PRECONDITIONS if probes is None else probes
+    missing = []
+    for name in preconditions_of(relative):
+        probe = table.get(name)
+        if probe is None:
+            missing.append("未定义的前置探针: " + name)
+            continue
+        ok, detail = probe()
+        if not ok:
+            missing.append(name + " -> " + detail)
+    return missing
+
+
+def summarize(results) -> int:
+    """把 [(路径, 结局)] 汇总成进程退出码。**纯逻辑、宿主可测**。
+
+    退出码 0 的条件：**没有 FAIL**，且**至少一项真的跑了（OK）**。
+    - 空集合 -> 非 0（"一个都没跑"不是"全绿"）；
+    - 全 SKIP -> 非 0（同理：前置全不满足不等于通过）。
     """
     if not results:
         return 1
-    return 0 if all(code == 0 for _, code in results) else 1
+    if any(outcome == FAIL for _, outcome in results):
+        return 1
+    if not any(outcome == OK for _, outcome in results):
+        return 1
+    return 0
 
 
 def run_one(relative: str):
-    """跑一个检查，返回退出码；**超时或文件缺失返回 None**。"""
+    """跑一个检查，返回 (结局, 说明)。
+
+    前置不满足 => (SKIP, 缺什么)，**不启动子进程**——启动一个明知会失败的程序，
+    再把它失败的结果算成"失败"或"通过"，两种都是错的。
+    """
     full = os.path.join(_TOOLS_DIR, relative)
     if not os.path.isfile(full):
-        return None
+        return FAIL, "登记的文件不存在: " + full
+    missing = missing_preconditions(relative)
+    if missing:
+        return SKIP, "缺前置 —— " + "；".join(missing)
     try:
         proc = subprocess.run(
             [sys.executable, full],
@@ -107,8 +210,13 @@ def run_one(relative: str):
             timeout=CHECK_TIMEOUT_S,
         )
     except subprocess.TimeoutExpired:
-        return None
-    return proc.returncode
+        return FAIL, "超时（%d 秒）" % CHECK_TIMEOUT_S
+    if proc.returncode == 0:
+        return OK, ""
+    if proc.returncode == 2:
+        return FAIL, ("exit=2 —— 探针认为前置齐全，子检查却报缺前置；两者判定不一致，"
+                      "按失败处理（不把「跑不了」混进「通过」）")
+    return FAIL, "exit=%d" % proc.returncode
 
 
 def main() -> int:
@@ -121,16 +229,17 @@ def main() -> int:
     results = []
     for relative in chosen:
         print("== " + relative)
-        code = run_one(relative)
-        if code is None:
-            print("   FAIL: 超时（%d 秒）或文件缺失" % CHECK_TIMEOUT_S)
-        else:
-            print("   exit=%d" % code)
-        results.append((relative, code))
+        outcome, detail = run_one(relative)
+        print("   " + outcome.upper() + (": " + detail if detail else ""))
+        results.append((relative, outcome))
 
-    failed = [p for p, c in results if c != 0]
+    failed = [p for p, o in results if o == FAIL]
+    skipped = [p for p, o in results if o == SKIP]
     print("")
-    print("共 %d 项，%d 项未通过" % (len(results), len(failed)))
+    print("共 %d 项：跑 %d 项、跳过 %d 项、失败 %d 项"
+          % (len(results), len(results) - len(skipped), len(skipped), len(failed)))
+    for p in skipped:
+        print("  SKIP: " + p)
     for p in failed:
         print("  FAIL: " + p)
     return summarize(results)
