@@ -109,4 +109,9 @@ Get-Content $log -Encoding UTF8 -ErrorAction SilentlyContinue |
     Select-String -Pattern "passed=|failed=|run exited|FAIL|PANIC|CPU EXCEPTION" |
     Select-Object -Last 20 | ForEach-Object { $_.Line }
 
+# QEMU stderr is ~650 KB of near-identical noise on every run. Keep it only when the
+# run produced no verdict, so .out/ cannot silently grow by hundreds of MB.
+$hasVerdict = Select-String -Path $log -Pattern "passed=" -Quiet -ErrorAction SilentlyContinue
+if ($hasVerdict) { Remove-Item $errLog -Force -ErrorAction SilentlyContinue }
+
 Write-Output ("[devcheck] DONE " + $label)
