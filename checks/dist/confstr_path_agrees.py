@@ -1,59 +1,97 @@
 #!/usr/bin/env python3
-"""门禁：libc 的 confstr(_CS_PATH) 必须与 shell 的 DEFAULT_PATH 逐字节一致。
+"""门禁：`confstr(_CS_PATH)` 与 shell 的默认 `PATH` 必须出自**同一个运行期构造点**。
 
-为什么需要它：这是两处真值源（libc 的 confstr 与 shell 的 env.rs）。本项初版写的是
-/programs:/bin 并声称「与 shell/init 的约定一致」——那句话是假的，值是编的
-（项目所有者质疑 ttyname 的同类问题后全面复查时抓出）。
+## 历史（为什么这条门禁改过两次）
 
-## 2026-10-14 起的判据变化
+1. **初版**：两处各写一份字面量，靠门禁核对「逐字节相同」。
+   —— 本项初版写的是 `/programs:/bin` 并声称「与 shell/init 的约定一致」，那句话是假的。
+2. **第二版**：两侧都由 `tools/abi/constants.json` 生成，门禁核对生成物相等。
+   —— 仍然是**编译期常量**，而 `_CS_PATH` 的内容是**部署事实**（卷标 / 有几块盘 / `3p` 在哪块盘上）。
+   两侧同错时等式断言永远是绿的（这正是本仓记录过的教训：「等式断言在两侧同错时是瞎的」）。
+3. **本版**：两侧都调用 `libsys::search_path()`，在运行期从 `/volumes` 的**真实挂载点**算。
+   门禁因此不再比字面量，而是查**接线与残留**：
 
-两侧现在都由 tools/abi/constants.json 的 tokens 节**生成**（tools/abi/generate.py），
-故本项不再从手写源码里抠字面量，改为查**接线**：
-
-  1. libc 的 confstr 必须引用 crate::abi_generated::DEFAULT_PATH_C；
-  2. shell 的 env.rs 必须引用 crate::abi_generated::DEFAULT_PATH；
-  3. 两侧**生成物**里的字节串必须逐字节相同（libc 那份带结尾 NUL）。
-
-第 3 条才是真正的内容核对——第 1、2 条只保证没人绕过生成物。
+   - libc 的 `confstr` 的 `_CS_PATH` 分支必须调用 `libsys::search_path()`；
+   - shell 的默认 PATH 必须调用同一个函数；
+   - **两侧都不得再出现 `/volumes/` 字面量**（那意味着又烧了一个部署事实）；
+   - 生成物里**不得再有** `DEFAULT_PATH_C` / `DEFAULT_PATH`（它们已被删除）；
+   - 构造点必须**只有一个**：`search_path` 定义在 libsys，且用生成的两个**系统约定**
+     （`PROGRAM_DIR` / `THIRD_PARTY_SUBDIR`）拼装，**不引用卷标**。
 """
 import os
 import re
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
 LIBC_HAND = os.path.join(ROOT, "libc", "src", "posix_batch7.rs")
 SHELL_HAND = os.path.join(ROOT, "shell", "src", "env.rs")
+SHELL_CMD = os.path.join(ROOT, "shell", "src", "commands.rs")
+LIBSYS_VOL = os.path.join(ROOT, "libsys", "src", "volume.rs")
 LIBC_GEN = os.path.join(ROOT, "libc", "src", "abi_generated.rs")
-SHELL_GEN = os.path.join(ROOT, "shell", "src", "abi_generated.rs")
 
+
+def strip_comments(src):
+    """去掉**整行注释**（`//` 开头）。
+    为什么必须剥：文档里合法地写着 `/volumes/<卷标>/3p`（解释「为什么不该烧死它」），
+    不剥会把**说明**当成**代码**误报。只剥整行注释、不动行尾注释——后者极少出现，
+    出现了也该被看见。
+    """
+    return '\n'.join(
+        ln for ln in src.split("\n") if not ln.lstrip().startswith("//")
+    )
 
 def read(p):
     with open(p, encoding="utf-8") as f:
         return f.read()
 
 
-def main():
-    libc_h, shell_h = read(LIBC_HAND), read(SHELL_HAND)
-    if not re.search(r"1 => crate::abi_generated::DEFAULT_PATH_C,", libc_h):
-        print("[confstr-path] FAIL: libc 的 confstr 未委托 crate::abi_generated::DEFAULT_PATH_C")
-        return 1
-    if not re.search(r"DEFAULT_PATH: &\[u8\] = crate::abi_generated::DEFAULT_PATH;", shell_h):
-        print("[confstr-path] FAIL: shell 的 DEFAULT_PATH 未委托 crate::abi_generated::DEFAULT_PATH")
-        return 1
+def fail(msg):
+    print("[confstr-path] FAIL: " + msg)
+    return 1
 
-    libc_g, shell_g = read(LIBC_GEN), read(SHELL_GEN)
-    m1 = re.search(r'pub const DEFAULT_PATH_C: &\[u8\] = b"([^"]*)\\0";', libc_g)
-    m2 = re.search(r'pub\(crate\) const DEFAULT_PATH: &\[u8\] = b"([^"]*)";', shell_g)
-    if not m1 or not m2:
-        print("[confstr-path] FAIL: 解析不出两侧生成物里的默认 PATH")
-        return 1
-    a, b = m1.group(1), m2.group(1)
-    if a != b:
-        print("[confstr-path] FAIL: 两侧生成物漂移（本不该发生——它们出自同一份 JSON）")
-        print("  libc  DEFAULT_PATH_C = %r" % a)
-        print("  shell DEFAULT_PATH   = %r" % b)
-        return 1
-    print("[confstr-path] OK: 两侧生成物一致；confstr(_CS_PATH) == shell PATH == %r" % a)
+
+def main():
+    libc_h = read(LIBC_HAND)
+    shell_h = read(SHELL_HAND)
+    shell_c = read(SHELL_CMD)
+    vol = read(LIBSYS_VOL)
+
+    # 1) 接线：两侧都调用同一个运行期构造点。
+    if "libsys::search_path()" not in libc_h:
+        return fail("libc 的 confstr(_CS_PATH) 未调用 libsys::search_path()")
+    if "libsys::search_path()" not in shell_h:
+        return fail("shell 的默认 PATH 未调用 libsys::search_path()")
+    if "libsys::search_path()" not in shell_c:
+        return fail("shell 的 help 文本仍从别处取默认 PATH（应同样调用 libsys::search_path()）")
+
+    # 2) 不得再有烧死的部署事实。
+    for path, name in ((LIBC_HAND, "libc/posix_batch7.rs"), (SHELL_HAND, "shell/env.rs")):
+        if "/volumes/" in strip_comments(read(path)):
+            return fail("%s 里仍有 /volumes/ 字面量（部署事实不该编译期烧死）" % name)
+
+    # 3) 生成物里不得再有默认 PATH 常量（已删除）。
+    gen = read(LIBC_GEN)
+    for bad in ("DEFAULT_PATH_C", "DEFAULT_PATH"):
+        if bad in gen:
+            return fail("libc 生成物里仍有 %s（应已删除）" % bad)
+    if os.path.exists(os.path.join(ROOT, "shell", "src", "abi_generated.rs")):
+        return fail("shell/src/abi_generated.rs 应已删除（它只剩一个默认 PATH 常量）")
+
+    # 4) 构造点唯一，且只用**系统约定**、不引用卷标。
+    if vol.count("pub fn search_path()") != 1:
+        return fail("libsys 里 search_path 必须**恰好定义一次**（当前 %d 次）" % vol.count("pub fn search_path()"))
+    m = re.search(r"pub fn search_path\(\)[^{]*\{(.*?)\n\}", vol, re.S)
+    if not m:
+        return fail("解析不出 search_path 的函数体")
+    body = m.group(1)
+    if "PROGRAM_DIR" not in body or "THIRD_PARTY_SUBDIR" not in body:
+        return fail("search_path 必须用生成的两个系统约定（PROGRAM_DIR / THIRD_PARTY_SUBDIR）拼装")
+    if "DATA_VOLUME_LABEL" in body or "BORUIX_DATA" in body:
+        return fail("search_path 里出现了卷标——卷标是部署事实，不能当判据")
+
+    print("[confstr-path] OK: 两侧都调用 libsys::search_path()；无 /volumes/ 字面量；"
+          "生成物里无默认 PATH 常量；构造点唯一且不引用卷标")
     return 0
 
 

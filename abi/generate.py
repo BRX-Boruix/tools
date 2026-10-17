@@ -91,20 +91,32 @@ def render_values(doc, entries):
 
 
 def token_values(doc):
-    """由 tokens 节派生出的值。派生而不写第二遍：卷标与子目录名是**唯一**输入。"""
+    """tokens 节的取值。**只导出「系统约定」，不导出「部署事实」。**
+
+    三类东西必须分清（这是本轮改动的全部理由）：
+
+    - **系统约定**：`PROGRAM_DIR`（`/programs`）、`THIRD_PARTY_SUBDIR`（`3p`）——由系统自己规定，
+      任何部署都一样 ⇒ 编译期常量，正确。
+    - **部署事实**：**卷标**、**有几块盘**、**`3p` 在哪块盘上**——由用户的实际磁盘决定 ⇒
+      **不能**编译期烧死。把 `/volumes/<某个卷标>/3p` 烧进二进制，等于假定用户用的就是
+      作者那块盘；真实运行下卷标可能不同、可能根本没有第二块盘、`3p` 也可能在系统盘上。
+      那样烧出来的 `PATH` / `_CS_PATH` 会指向**不存在的目录**，且没有任何地方会报错。
+      故这些路径改由 `libsys::volume::search_path()` 在运行期从**真实挂载点**算出。
+    - **构建工具默认值**：`DATA_VOLUME_LABEL` 仍是 `mkimg` 的默认卷标——那是**构建期**的选择，
+      与运行期无关，保留。
+    """
     t = doc["tokens"]
     label = t["DATA_VOLUME_LABEL"]
-    sub = t["THIRD_PARTY_SUBDIR"]
-    vol = "/volumes/" + label
-    third = vol + "/" + sub
     return {
-        "DATA_VOLUME_LABEL": label,
-        "THIRD_PARTY_SUBDIR": sub,
-        "DATA_VOLUME_PATH": vol,
-        "THIRD_PARTY_PATH": third,
-        "WELCOME_PROBE": vol + "/welcome.txt",
-        "TCC_DIR": third + "/tcc",
-        "DEFAULT_PATH": t["PROGRAM_DIR"] + ":" + third,
+        "PROGRAM_DIR": t["PROGRAM_DIR"],
+        "THIRD_PARTY_SUBDIR": t["THIRD_PARTY_SUBDIR"],
+        "DATA_VOLUME_LABEL": t["DATA_VOLUME_LABEL"],
+        # **已知残留（同一族的最后一处）**：tcc 的 `CONFIG_TCCDIR` 只能编译期定死
+        # （`-B` 能运行期覆盖，但系统里没有 wrapper 去传它，tcc 也不读 libpath 环境变量）。
+        # 故它仍由卷标派生 ⇒ 换卷标时 tcc 找不到自己的 include/lib。
+        # 真正的修法是「tcc 从 argv[0] 推导自己的目录」或「系统给一个 -B wrapper」，
+        # 两者都要动 tcc 仓/分发形态，已登记待办（见 docs/TODO/3p.md）。
+        "TCC_DIR": "/volumes/" + label + "/" + t["THIRD_PARTY_SUBDIR"] + "/tcc",
     }
 
 
@@ -118,26 +130,22 @@ def render_python_tokens(doc):
         "# 门禁：python tools/abi/generate.py --check\n\n"
         'DATA_VOLUME_LABEL = "%s"\n'
         'THIRD_PARTY_SUBDIR = "%s"\n'
-        'DATA_VOLUME_PATH = "%s"\n'
-        'THIRD_PARTY_PATH = "%s"\n' % (v["DATA_VOLUME_LABEL"], v["THIRD_PARTY_SUBDIR"],
-                                        v["DATA_VOLUME_PATH"], v["THIRD_PARTY_PATH"])
+        'PROGRAM_DIR = "%s"\n' % (v["DATA_VOLUME_LABEL"], v["THIRD_PARTY_SUBDIR"],
+                                    v["PROGRAM_DIR"])
     )
 
 
 def render_libsys_tokens(doc):
     v = token_values(doc)
-    out = ["\n// ---------- 系统标识 token（卷标 / 3p 子目录 / 由它们派生的路径） ----------\n\n"]
-    for k in ("DATA_VOLUME_LABEL", "THIRD_PARTY_SUBDIR", "DATA_VOLUME_PATH",
-              "THIRD_PARTY_PATH", "WELCOME_PROBE"):
+    out = ["\n// ---------- 系统标识 token（**只有系统约定**；部署事实在运行期发现） ----------\n\n"]
+    # 卷标 / 有几块盘 / 3p 在哪块盘上都是**部署事实**，不在此导出——由
+    # libsys::volume::search_path() 从 /volumes 的真实挂载点算出。
+    for k in ("PROGRAM_DIR", "THIRD_PARTY_SUBDIR", "DATA_VOLUME_LABEL"):
         out.append('pub const %s: &str = "%s";\n' % (k, v[k]))
     return "".join(out)
 
 
-def render_shell_tokens(doc):
-    v = token_values(doc)
-    return (HEADER.replace("@SRC@", SRC_REL)
-            + "\n// ---------- 默认 PATH（由 ABI token 拼出；组合策略在 JSON 里） ----------\n\n"
-            + 'pub(crate) const DEFAULT_PATH: &[u8] = b"%s";\n' % v["DEFAULT_PATH"])
+# shell 的默认 PATH 也不再生成：见上一条注释（改由 libsys::volume::search_path() 运行期算）。
 
 
 def render_libsys_paths(doc):
@@ -307,13 +315,9 @@ def render_libc_errno(doc):
     return "".join(out)
 
 
-def render_libc_tokens(doc):
-    """libc 侧的 token：confstr(_CS_PATH) 与 shell 的 DEFAULT_PATH 必须同一份。
-
-    带结尾 NUL（`\0`）：confstr 的返回值含 NUL，故这里给出**已含 NUL** 的字节串。
-    """
-    return ("\n// ---------- 默认 PATH（与 shell 的 DEFAULT_PATH 同源） ----------\n\n"
-            'pub const DEFAULT_PATH_C: &[u8] = b"%s\\0";\n' % token_values(doc)["DEFAULT_PATH"])
+# `confstr(_CS_PATH)` 与 shell 的默认 PATH **不再由生成器产出**：它们是**部署事实**
+# （卷标 / 有几块盘 / 3p 在哪块盘上），改由 libsys::volume::search_path() 在运行期从
+# `/volumes` 的真实挂载点算出。此处保留注释是为了让后来者知道「为什么这里空了」。
 
 
 # **整行生成**：C 头文件里的一行由生成器重写（`#define` 前后还有大量手写说明，
@@ -421,9 +425,8 @@ GEN_FILES = (
      + render_libsys_paths(doc) + render_libsys_tokens(doc) + render_wire(doc)),
     ("libc", LIBC_GEN, lambda doc: HEADER.replace("@SRC@", SRC_REL)
      + libc_type_imports(doc) + render_values(doc, LIBC_VALUES)
-     + render_libc_tokens(doc) + render_libc_errno(doc) + render_libc_c_consts(doc)),
+     + render_libc_errno(doc) + render_libc_c_consts(doc)),
     ("tools:generated.py", TOOLS_GEN, render_python_tokens),
-    ("shell:abi", SHELL_GEN, render_shell_tokens),
 )
 
 # (标签, 手写文件, 是否检查 domain/op, 是否检查 errno 委托, 是否检查数值引用)

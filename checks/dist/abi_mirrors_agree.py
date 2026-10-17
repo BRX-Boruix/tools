@@ -543,9 +543,10 @@ TOKEN_WIRING = (
      r'getattr\(args, "label", generated\.DATA_VOLUME_LABEL\)'),
     ("3p 子目录名", "tools/tools_build/b3p.py",
      r"THIRD_PARTY_SUBDIR = generated\.THIRD_PARTY_SUBDIR"),
-    ("默认 PATH", "shell/src/env.rs",
-     r"pub\(crate\) const DEFAULT_PATH: &\[u8\] = crate::abi_generated::DEFAULT_PATH;"),
-    ("数据盘探针", "init/src/main.rs", r"let probe = libsys::WELCOME_PROBE;"),
+    # **默认 PATH 与数据盘探针**这两条接线**已删除**：它们是**部署事实**（卷标 / 有几块盘 /
+    # 3p 在哪块盘上），不该由生成物提供。现在两侧都调用 libsys::search_path()，在运行期从
+    # `/volumes` 的真实挂载点算——那件事由 checks/dist/confstr_path_agrees.py 单独负责
+    # （它查接线、查残留、查构造点唯一性）。此处不重复登记，否则就是第二个漂移源。
 )
 
 TOKEN_HARDCODED = (
