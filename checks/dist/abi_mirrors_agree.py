@@ -570,12 +570,9 @@ def check_token_contracts():
         if not re.search(pat, read(rel)):
             print("  FAIL %s：%s 里没有引用生成物（应匹配 %s）" % (concept, rel, pat))
             ok = False
-    # tcc 的 config.h 是**整行生成**（前后还有大量手写说明）：直接核对它等于 JSON 派生的值。
-    m = re.search(r'#define CONFIG_TCCDIR "([^"]*)"', read("tcc-on-boruix/boruix/config.h"))
-    if not m or m.group(1) != third + "/tcc":
-        print("  FAIL tcc 的 CONFIG_TCCDIR 与 JSON 不一致：实为 %s，应为 %s/tcc"
-              % (m.group(1) if m else "缺失", third))
-        ok = False
+    # tcc 的 `CONFIG_TCCDIR` **不再**与 JSON 比对：它已改为空串（「未配置」），由 tcc 在启动时
+    # 按 `argv[0]` 推导（见 tcc-on-boruix/boruix/UPSTREAM-PATCHES）。原先那条「整行生成」接线
+    # 把**盘名**烧进了二进制——那正是本轮要拔掉的东西，故此处只留记录、不再校验。
     for rel, pat in TOKEN_HARDCODED:
         mm = re.search(pat, read(rel))
         if mm:
