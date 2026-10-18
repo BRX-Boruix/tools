@@ -74,6 +74,10 @@ OFFLINE_CHECKS = (
     "../libc/tools/audit_errno_sync.py",
     "../libc/tools/audit_stub_symbols.py",
     "../libc/tools/audit_header_coverage.py",
+    # 3P5-2a：符号可见性清单入档。清单的单一事实源是 C 头文件，表由 libc 的生成器机械提取，
+    # 本项只负责「那份已提交的清单没被手改、也没与头文件漂移」。
+    # 为什么值得一道门禁：.so 一旦发布即成 ABI 契约，清单漂移就是悄悄破坏契约。
+    "../libc/tools/abi_manifest.py",
     # 覆盖面：每个 C 可见导出要么被某个测试组**提到**，要么在 TRIAGED 里写明理由。
     # 它把"审完全部 362 个导出"从一句声称变成可数的清单（名字出现只是下界）。
     "../libc/tools/audit_conformance_coverage.py",
