@@ -252,6 +252,10 @@
       "domain": "TASK",
       "op": 10
     },
+    "SYS_TASK_EXEC": {
+      "domain": "TASK",
+      "op": 0
+    },
     "SYS_TASK_EXIT": {
       "domain": "TASK",
       "op": "DELETE"

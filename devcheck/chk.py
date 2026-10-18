@@ -25,7 +25,10 @@ USAGE_RC = 2
 
 def _crate(name):
     os.makedirs(OUT, exist_ok=True)
-    log = os.path.join(OUT, "crate_" + name + ".txt")
+    # 日志名不能用原始路径：crate 参数可能是 kernel/crates/task 这种相对路径，
+    # 分隔符会把文件名拆成子目录。
+    safe = name.replace("/", "_").replace("\\", "_")
+    log = os.path.join(OUT, "crate_" + safe + ".txt")
     cmd = ["cargo", "build",
            "--manifest-path", os.path.join(config.PROJECT_ROOT, name, "Cargo.toml"),
            "--target", config.TARGET, "--release"]
