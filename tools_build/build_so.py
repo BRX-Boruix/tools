@@ -82,6 +82,50 @@ def defined_symbols(archive, nm):
     return out
 
 
+def dynamic_defined_symbols(so, nm):
+    """取 .so 的**动态符号表里已定义**的符号集（`.dynsym`，即真正对外可见的那些）。"""
+    r = subprocess.run([nm, "--dynamic", "--defined-only", so], capture_output=True, text=True)
+    if r.returncode != 0:
+        sys.exit("llvm-nm --dynamic 失败（%d）：%s" % (r.returncode, r.stderr.strip()[:200]))
+    out = set()
+    for line in r.stdout.splitlines():
+        parts = line.split()
+        if parts:
+            out.add(parts[-1])
+    return out
+
+
+def check_export_surface(so, kept, nm, strict):
+    """把「声明∩本库定义」（我们希望导出的）与 `.dynsym` 里**实际**导出的对账。
+
+    为什么必须做：此前这条链上没有任何断言——`--gc-sections` 会把 `compiler_builtins` 的
+    **弱符号** libm 函数（acos/sin/sqrt…）连同其 section 一起裁掉，于是 `.so` 的导出面**悄悄
+    小于** version script。2026-10-25 量准过：声明 406 → 生效 402 → dynsym 346，差的 56 个全是
+    这些弱符号。这个缺口以前只写在注释里（等于没写）；现在每次构建都打印，且 `--strict-exports`
+    时非零退出，可以当门禁用。
+
+    不多不少才是目标：`缺` = 想要却没导出（能力谎报），`多` = 没想要却泄露（ABI 面失控）。
+    """
+    have = dynamic_defined_symbols(so, nm)
+    missing = [s for s in kept if s not in have]
+    extra = sorted(s for s in have if s not in kept)
+    print("[build_so] 导出面对账：声明∩定义=%d，实际 dynsym=%d，缺 %d，多 %d"
+          % (len(kept), len(have), len(missing), len(extra)))
+    if missing:
+        head = ", ".join(missing[:12]) + ("…" if len(missing) > 12 else "")
+        print("[build_so]   缺（%d）：%s" % (len(missing), head))
+        gap = os.path.join(os.path.dirname(so), "missing-exports.txt")
+        with open(gap, "w", encoding="ascii", newline="\n") as f:
+            f.write("\n".join(missing) + "\n")
+        print("[build_so]   清单已写入 " + gap)
+    if extra:
+        head = ", ".join(extra[:12]) + ("…" if len(extra) > 12 else "")
+        print("[build_so]   多（%d）：%s" % (len(extra), head))
+    if strict and (missing or extra):
+        return "导出面与 version script 不一致（--strict-exports）"
+    return None
+
+
 DEFAULT_DEST = os.path.join(ROOT, "tools", "diskfiles", "3p")
 
 
@@ -91,6 +135,8 @@ def main():
     ap.add_argument("--dest", default=DEFAULT_DEST)
     ap.add_argument("--no-stage", action="store_true",
                     help="只构建，不铺到数据盘")
+    ap.add_argument("--strict-exports", action="store_true",
+                    help="导出面必须与 version script 完全一致，否则非零退出（门禁用）")
     args = ap.parse_args()
     profile = "debug" if args.debug else "release"
     # 1) 刷新 ABI 导出清单（脚本自己写文件——不要用 shell 重定向，见该脚本说明）。
@@ -161,6 +207,9 @@ def main():
         + keep +
         ["-o", out])
     print("[build_so] 产出", out, "(%d KB)" % (os.path.getsize(out) // 1024))
+    bad = check_export_surface(out, kept, nm, args.strict_exports)
+    if bad:
+        sys.exit("[build_so] " + bad)
 
     # 铺到数据盘（同 build_rtld.py 的范式）：`.so` 一直是**手工拷**到 tools/diskfiles/3p/ 的
     # 资产，没有任何脚本会更新它。2026-10 实测过同族事故：盘上是旧的、机内跑的也是旧的，
