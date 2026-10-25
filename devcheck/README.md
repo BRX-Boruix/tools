@@ -35,8 +35,18 @@
 ```powershell
 python tools\devcheck\chk.py kernel
 python tools\devcheck\chk.py kernel-tests
+python tools\devcheck\chk.py test-features   # 逐个 kernel-test* feature 各一次 cargo check
 python tools\devcheck\chk.py crate shell
 ```
+
+**`test-features` 为什么存在**：内核的停机验收测试各自挂在一个 `kernel-test-*` feature
+后面，而日常只跑 `kernel-tests`——那些 feature 里的代码**可能长期没被编译过**。
+2026-10-25 实测抓到三处：`kernel-test-m5` 引用了作用域里不存在的 `nr`，
+`kernel-test-m43`/`kernel-test-m44` 还在用 `loader::load` 的旧 3 参形态（现 7 参）。
+三者都修了，并且这条门禁让「测试腐烂」不能再静默发生。
+
+feature 清单**从 `kernel/Cargo.toml` 的 `[features]` 解析**，不硬编码——硬编码清单
+本身就是下一个漂移源（新加一个停机验收 feature 会被漏掉）。
 
 ### `verify_precond.py` —— 门禁前置探测的场景验证
 
