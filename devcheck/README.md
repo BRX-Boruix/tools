@@ -30,6 +30,23 @@
 `nsdbg_run` 一批近乎相同的副本——它们的差别只是内存大小、`--test`、`--redisk`，
 那些现在都是参数。
 
+**`-test` 模式的判决行**：内核自测套件尾部会打印 `[kt] DONE: executed=N declared=M`
+（非破坏性测试全部跑完），脚本以它作为停止条件。没有这行时只能等 `run exited with code`
+——那是 libccheck 的格式，`-test` 永远不会出现，于是**必然**被读成"卡死/失败"
+（2026-10-25 就因此误判过一次，见 `docs/evidence/README.md`）。
+
+**分片与单条复现**（构建期注入，`option_env!`；本内核没有运行时环境变量）：
+
+```powershell
+# 只跑一条（复现单条挂死：分钟级）
+.\tools\devcheck\lc_run.ps1 -label one -test -ktOnly test_waitpid_e2e
+# 把全量拆成 4 片，跑第 0 片
+.\tools\devcheck\lc_run.ps1 -label shard0 -test -ktShard 0/4
+```
+
+套件里每条测试都有 `[kt] >> #i name` / `[kt] << #i name` 标记：**卡死时最后一条没有配对
+`<<` 的就是凶手**，比"整体无输出"有用得多。
+
 ### `chk.py` —— 编译检查
 
 ```powershell

@@ -51,7 +51,11 @@ param(
     [switch]$testdisk,
     [switch]$noRedisk,
     [string]$initRun = "libccheck",
-    [int]$timeoutSec = 1500
+    [int]$timeoutSec = 1500,
+    # Kernel-test sharding / single-test reproduction. Baked at BUILD time via
+    # option_env!, so these must be exported before `br` runs (see main.rs).
+    [string]$ktOnly = "",
+    [string]$ktShard = ""
 )
 
 $ErrorActionPreference = "Continue"
@@ -75,6 +79,9 @@ if ($initRun) {
 } else {
     Remove-Item Env:\BORUIX_INIT_RUN -ErrorAction SilentlyContinue
 }
+# Build-time selectors for the kernel selftest suite ("" = unset = run everything).
+if ($ktOnly) { $env:BORUIX_KT_ONLY = $ktOnly } else { Remove-Item Env:\BORUIX_KT_ONLY -ErrorAction SilentlyContinue }
+if ($ktShard) { $env:BORUIX_KT_SHARD = $ktShard } else { Remove-Item Env:\BORUIX_KT_SHARD -ErrorAction SilentlyContinue }
 
 Remove-Item $log -ErrorAction SilentlyContinue
 Remove-Item $errLog -ErrorAction SilentlyContinue
@@ -94,7 +101,7 @@ while ((Get-Date) -lt $deadline) {
     Start-Sleep -Milliseconds 700
     if ($proc.HasExited) { Write-Output "[devcheck] br exited"; break }
     if (Test-Path $log) {
-        if (Get-Content $log -ErrorAction SilentlyContinue | Select-String -Pattern "run exited with code" -Quiet) {
+        if (Get-Content $log -ErrorAction SilentlyContinue | Select-String -Pattern "run exited with code|\[kt\] DONE" -Quiet) {
             # let the serial tail drain before collecting
             Start-Sleep -Seconds 12
             break
