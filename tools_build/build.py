@@ -29,6 +29,7 @@ def _cargo_build_kernel(
     use_m5: bool = False,
     use_waitpid: bool = False,
     use_signal: bool = False,
+    use_sstack: bool = False,
     signal_halt: str = "nested",
     release: bool = False,
 ) -> int:
@@ -121,6 +122,9 @@ def _cargo_build_kernel(
     if use_waitpid:
         features.append("kernel-test-waitpid")
         info("C7.1/#7：启用 kernel-test-waitpid feature（waitpid 父子链停机验收，跑完即停）")
+    if use_sstack:
+        features.append("kernel-test-sstack-guard")
+        info("sstack：启用 kernel-test-sstack-guard feature（syscall 栈守卫页停机验收，跑完即停）")
     if features:
         cmd += ["--features", ",".join(features)]
     r = subprocess.run(cmd, cwd=config.KERNEL_DIR, env=env)
@@ -468,6 +472,7 @@ def cmd(args: argparse.Namespace) -> int:
         use_m44=getattr(args, "test_m44", False),
         use_m5=getattr(args, "test_m5", False),
         use_waitpid=getattr(args, "test_waitpid", False),
+        use_sstack=getattr(args, "test_sstack", False),
         use_signal=getattr(args, "test_signal", False),
         signal_halt=getattr(args, "signal_halt", "nested"),
         release=release,

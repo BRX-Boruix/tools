@@ -65,6 +65,23 @@ python tools\devcheck\chk.py crate shell
 feature 清单**从 `kernel/Cargo.toml` 的 `[features]` 解析**，不硬编码——硬编码清单
 本身就是下一个漂移源（新加一个停机验收 feature 会被漏掉）。
 
+### `kt_features.ps1` —— 停机验收 feature 的**运行**覆盖
+
+```powershell
+.\tools\devcheck\kt_features.ps1              # 全部 12 个配置各跑一次
+.\tools\devcheck\kt_features.ps1 -only m43     # 只跑一个
+```
+
+内核的停机验收测试各自编码在**不同的 kernel** 里（一个 feature 一个 build），跑完就停机，
+所以不能共享一次启动。这个脚本做的就是「逐个 build + boot + 跑 + 停」。
+
+它补的是 `chk.py test-features` 补不上的那一半：`test-features` 只证明这些代码**编译**得过，
+没有任何东西证明它们**跑**得起来——`kernel-test-m43/m44` 就是这样烂了几个月的。
+
+判决口径（脚本**不发明 PASS**）：打印每个配置的行数、`: FAIL` 数、panic 数、`[kt] >>` 标记数
+与最后两行非空输出；判定由人读完日志后写进文档。停机测试没有 verdict 行可等，故停止规则是
+「QEMU 已启动（日志出现 `QEMU`）、之后日志静默 `-idleSec` 秒」，或到 `-perTestSec` 硬上限。
+
 ### `verify_precond.py` —— 门禁前置探测的场景验证
 
 ```powershell
