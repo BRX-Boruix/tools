@@ -41,6 +41,9 @@ param(
     # test_ahci6b fail ("ports with completion IRQ enabled: 0 / 6" instead of 1/6).
     # Measured 2026-10-26: same kernel, same flags, only --redisk differs.
     [bool]$redisk = $true,
+    # Use -noRedisk to boot on the ALREADY EXISTING disk.img (experiments only: see
+    # the PxIE note above - a reused image changes AHCI port state).
+    [switch]$noRedisk,
     # Seconds to keep collecting after the verdict line matched.
     [int]$holdSec = 20,
     # Build-time selector passthrough (BORUIX_KT_ONLY): run ONE test and skip the
@@ -100,6 +103,7 @@ if (-not $configs) { Write-Output ("[ktf] unknown config: " + $only); exit 2 }
 # The halt tests run before init: make sure no runtime command is injected.
 Remove-Item Env:\BORUIX_INIT_RUN -ErrorAction SilentlyContinue
 if ($onlyTest) { $env:BORUIX_KT_ONLY = $onlyTest } else { Remove-Item Env:\BORUIX_KT_ONLY -ErrorAction SilentlyContinue }
+if ($noRedisk) { $redisk = $false }
 
 $rows = @()
 foreach ($c in $configs) {
