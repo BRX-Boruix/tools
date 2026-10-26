@@ -47,7 +47,9 @@ param(
     # whole non-destructive suite. Needed because a stalled test UPSTREAM of the one
     # you care about would otherwise hide it (test_ahci6b does exactly that when it
     # spins). Usage: -onlyTest test_elf_loader
-    [string]$onlyTest = ""
+    [string]$onlyTest = "",
+    # Override the config verdict regex (useful with -only single -onlyTest <fn>).
+    [string]$expect = ""
 )
 
 $ErrorActionPreference = "Continue"
@@ -69,22 +71,27 @@ $configs = @(
     @{ Name = "m33";            Args = @("--test-m3.3");         Expect = "user process terminated by" },
     @{ Name = "pre2";           Args = @("--test-pre2");         Expect = "PRE-2" },
     @{ Name = "m41";            Args = @("--test-m4.1");         Expect = "exit\(code=42\)" },
-    # m42: the marker chars go to the framebuffer console (NOT serial), so the only
-    # serial-observable verdict is the pid= field of the syscall trace; the criterion
-    # line itself is the stable anchor to stop on.
+    # m42: judge from the pid= field of the syscall trace (3 distinct pids interleaving).
+    # Its marker chars DO reach the serial log in other configs (verified on
+    # signal-handler: A/B/C all present), so the chars are not the reliable anchor here —
+    # the criterion line is.
     @{ Name = "m42";            Args = @("--test-m4.2");         Expect = "verdict: PASS iff" },
     @{ Name = "m43";            Args = @("--test-m4.3");         Expect = "Hello from ELF" },
     @{ Name = "m44";            Args = @("--test-m4.4");         Expect = "" },
     @{ Name = "m5";             Args = @("--test-m5");           Expect = "ipc-test\] PASS|COW" },
     @{ Name = "waitpid";        Args = @("--test-waitpid");      Expect = "test-waitpid-e2e\]" },
     @{ Name = "sstack";         Args = @("--test-sstack");       Expect = "guard page hit" },
-    # signal-*: the A/B/C/D markers also go to the framebuffer console, so there is no
-    # serial verdict line to wait for; the run ends in a user `jmp $` and the idle rule
-    # stops us. Judge from the syscall-nr sequence: 0x13(write A) ... 0x84(sigreturn) ...
-    # 0x13(write C/D) — 0x84 is the serial-observable proof that sigreturn ran.
+    # signal-*: the run ends in a user `jmp $` loop, so the idle rule finishes it. The
+    # evidence is the marker chars (A/B/C/D) plus the rt_sigreturn lines (nr=0x84).
     @{ Name = "signal-handler"; Args = @("--test-signal", "--signal-halt", "handler"); Expect = "" },
     @{ Name = "signal-fault";   Args = @("--test-signal", "--signal-halt", "fault");   Expect = "" },
-    @{ Name = "signal-nested";  Args = @("--test-signal", "--signal-halt", "nested");  Expect = "" }
+    @{ Name = "signal-nested";  Args = @("--test-signal", "--signal-halt", "nested");  Expect = "" },
+    # Generic single-test probe: pair with -onlyTest <fn>. Built for bisecting ONE test
+    # (e.g. test_ahci6b_interrupt_completion) in a few minutes instead of a full suite.
+    # NOTE: --test is REQUIRED here: without the kernel-tests feature nothing is compiled
+    # and the kernel silently boots with no test at all (measured: 0 test lines, filter
+    # banner missing). -onlyTest then narrows it to the single test.
+    @{ Name = "single";         Args = @("--test");                Expect = "" }
 )
 
 if ($only) { $configs = $configs | Where-Object { $_.Name -eq $only } }
@@ -117,6 +124,7 @@ foreach ($c in $configs) {
     $armed = $false
     $verdictAt = $null
     $expectRe = $c.Expect
+    if ($expect) { $expectRe = $expect }
     while ((Get-Date) -lt $deadline) {
         Start-Sleep -Milliseconds 700
         if ($proc.HasExited) { break }
