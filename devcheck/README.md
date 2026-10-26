@@ -68,9 +68,18 @@ feature 清单**从 `kernel/Cargo.toml` 的 `[features]` 解析**，不硬编码
 ### `kt_features.ps1` —— 停机验收 feature 的**运行**覆盖
 
 ```powershell
-.\tools\devcheck\kt_features.ps1              # 全部 12 个配置各跑一次
-.\tools\devcheck\kt_features.ps1 -only m43     # 只跑一个
+.\tools\devcheck\kt_features.ps1                                  # 全部 12 个配置各跑一次
+.\tools\devcheck\kt_features.ps1 -only m43                         # 只跑一个配置
+.\tools\devcheck\kt_features.ps1 -only m43 -onlyTest test_elf_loader  # 只跑一条测试
 ```
+
+`-onlyTest` 是构建期选择器（`BORUIX_KT_ONLY`）的透传：跳过整套、直达那一条。它不只是"快"——
+当**上游**某条测试挂住（`test_ahci6b` 现在就自旋）时，整套永远跑不到你的停机验收用例，
+只有单条跑能验。
+
+**收工规则**：优先按配置的 `Expect`（判据正则）命中后宽限 `-holdSec` 秒收工；没有判据时才退回
+「静默 `-idleSec` 秒」。这条是被打脸换来的：早先只按静默判，把 `test_ahci6b` 长达数分钟的
+中断 I/O 段当成"跑完了"，于是每次都截断在同一个地方。
 
 内核的停机验收测试各自编码在**不同的 kernel** 里（一个 feature 一个 build），跑完就停机，
 所以不能共享一次启动。这个脚本做的就是「逐个 build + boot + 跑 + 停」。

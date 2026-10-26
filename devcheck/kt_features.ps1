@@ -40,7 +40,14 @@ param(
     # Default TRUE: a REUSED disk.img changes AHCI state and makes
     # test_ahci6b fail ("ports with completion IRQ enabled: 0 / 6" instead of 1/6).
     # Measured 2026-10-26: same kernel, same flags, only --redisk differs.
-    [bool]$redisk = $true
+    [bool]$redisk = $true,
+    # Seconds to keep collecting after the verdict line matched.
+    [int]$holdSec = 20,
+    # Build-time selector passthrough (BORUIX_KT_ONLY): run ONE test and skip the
+    # whole non-destructive suite. Needed because a stalled test UPSTREAM of the one
+    # you care about would otherwise hide it (test_ahci6b does exactly that when it
+    # spins). Usage: -onlyTest test_elf_loader
+    [string]$onlyTest = ""
 )
 
 $ErrorActionPreference = "Continue"
@@ -50,19 +57,34 @@ New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 
 # NOTE: the CLI spells them with dots (--test-m4.3), not the Cargo feature
 # names (kernel-test-m43). Keep this table in sync with `python tools/main.py br --help`.
+#
+# `Expect` = the config own VERDICT line (regex). When it shows up the run is done:
+# we then wait `-$holdSec` more seconds to collect any trailing output and stop.
+# This exists because "silence = finished" is a LIE for long I/O: test_ahci6b
+# switches to interrupt-driven I/O and can go quiet for minutes (the driver itself
+# documents the interrupt path as "69x slower"), which made every run look stopped
+# in the middle. Verdict-driven stopping is exact; the idle rule stays only as a
+# fallback for configs whose verdict we cannot name.
 $configs = @(
-    @{ Name = "m33";            Args = @("--test-m3.3") },
-    @{ Name = "pre2";           Args = @("--test-pre2") },
-    @{ Name = "m41";            Args = @("--test-m4.1") },
-    @{ Name = "m42";            Args = @("--test-m4.2") },
-    @{ Name = "m43";            Args = @("--test-m4.3") },
-    @{ Name = "m44";            Args = @("--test-m4.4") },
-    @{ Name = "m5";             Args = @("--test-m5") },
-    @{ Name = "waitpid";        Args = @("--test-waitpid") },
-    @{ Name = "sstack";         Args = @("--test-sstack") },
-    @{ Name = "signal-handler"; Args = @("--test-signal", "--signal-halt", "handler") },
-    @{ Name = "signal-fault";   Args = @("--test-signal", "--signal-halt", "fault") },
-    @{ Name = "signal-nested";  Args = @("--test-signal", "--signal-halt", "nested") }
+    @{ Name = "m33";            Args = @("--test-m3.3");         Expect = "user process terminated by" },
+    @{ Name = "pre2";           Args = @("--test-pre2");         Expect = "PRE-2" },
+    @{ Name = "m41";            Args = @("--test-m4.1");         Expect = "exit\(code=42\)" },
+    # m42: the marker chars go to the framebuffer console (NOT serial), so the only
+    # serial-observable verdict is the pid= field of the syscall trace; the criterion
+    # line itself is the stable anchor to stop on.
+    @{ Name = "m42";            Args = @("--test-m4.2");         Expect = "verdict: PASS iff" },
+    @{ Name = "m43";            Args = @("--test-m4.3");         Expect = "Hello from ELF" },
+    @{ Name = "m44";            Args = @("--test-m4.4");         Expect = "" },
+    @{ Name = "m5";             Args = @("--test-m5");           Expect = "ipc-test\] PASS|COW" },
+    @{ Name = "waitpid";        Args = @("--test-waitpid");      Expect = "test-waitpid-e2e\]" },
+    @{ Name = "sstack";         Args = @("--test-sstack");       Expect = "guard page hit" },
+    # signal-*: the A/B/C/D markers also go to the framebuffer console, so there is no
+    # serial verdict line to wait for; the run ends in a user `jmp $` and the idle rule
+    # stops us. Judge from the syscall-nr sequence: 0x13(write A) ... 0x84(sigreturn) ...
+    # 0x13(write C/D) — 0x84 is the serial-observable proof that sigreturn ran.
+    @{ Name = "signal-handler"; Args = @("--test-signal", "--signal-halt", "handler"); Expect = "" },
+    @{ Name = "signal-fault";   Args = @("--test-signal", "--signal-halt", "fault");   Expect = "" },
+    @{ Name = "signal-nested";  Args = @("--test-signal", "--signal-halt", "nested");  Expect = "" }
 )
 
 if ($only) { $configs = $configs | Where-Object { $_.Name -eq $only } }
@@ -70,6 +92,7 @@ if (-not $configs) { Write-Output ("[ktf] unknown config: " + $only); exit 2 }
 
 # The halt tests run before init: make sure no runtime command is injected.
 Remove-Item Env:\BORUIX_INIT_RUN -ErrorAction SilentlyContinue
+if ($onlyTest) { $env:BORUIX_KT_ONLY = $onlyTest } else { Remove-Item Env:\BORUIX_KT_ONLY -ErrorAction SilentlyContinue }
 
 $rows = @()
 foreach ($c in $configs) {
@@ -92,6 +115,8 @@ foreach ($c in $configs) {
     $lastSize = -1
     $stableSince = $null
     $armed = $false
+    $verdictAt = $null
+    $expectRe = $c.Expect
     while ((Get-Date) -lt $deadline) {
         Start-Sleep -Milliseconds 700
         if ($proc.HasExited) { break }
@@ -99,12 +124,21 @@ foreach ($c in $configs) {
         if (Test-Path $log) { $size = (Get-Item $log).Length }
         if ($size -ne $lastSize) {
             $stableSince = $null
+            $verdictAt = $null   # new output: restart the hold window
+            if ($expectRe -and $size -gt 0) {
+                if (Select-String -Path $log -Pattern $expectRe -Quiet -ErrorAction SilentlyContinue) {
+                    $verdictAt = Get-Date
+                }
+            }
             if (-not $armed -and $size -gt 0) {
                 if (Select-String -Path $log -Pattern "QEMU" -Quiet -ErrorAction SilentlyContinue) { $armed = $true }
             }
-        } elseif ($armed) {
-            if ($null -eq $stableSince) { $stableSince = Get-Date }
-            elseif (((Get-Date) - $stableSince).TotalSeconds -ge $idleSec) { break }
+        } else {
+            if ($null -ne $verdictAt -and ((Get-Date) - $verdictAt).TotalSeconds -ge $holdSec) { break }
+            if ($armed) {
+                if ($null -eq $stableSince) { $stableSince = Get-Date }
+                elseif (((Get-Date) - $stableSince).TotalSeconds -ge $idleSec) { break }
+            }
         }
         $lastSize = $size
     }
@@ -119,15 +153,21 @@ foreach ($c in $configs) {
     $panic = @($lines | Select-String -Pattern "PANIC|panicked at|CPU EXCEPTION" -CaseSensitive).Count
     $marks = @($lines | Select-String -Pattern "^\[kt\] >>").Count
     $tail = @($lines | Where-Object { $_ -ne "" } | Select-Object -Last 2)
+    $hit = "n/a"
+    if ($expectRe) {
+        $hit = "NO"
+        if ($lines.Count -gt 0 -and (Select-String -Path $log -Pattern $expectRe -Quiet -ErrorAction SilentlyContinue)) { $hit = "YES" }
+    }
     $rows += [pscustomobject]@{
         Name = $name
         Lines = $lines.Count
         Fail = $fail
         Panic = $panic
         KtMarks = $marks
+        Verdict = $hit
         LastLine = ($tail -join " | ")
     }
-    Write-Output ("[ktf] " + $name + ": lines=" + $lines.Count + " fail=" + $fail + " panic=" + $panic + " kt=" + $marks)
+    Write-Output ("[ktf] " + $name + ": lines=" + $lines.Count + " fail=" + $fail + " panic=" + $panic + " kt=" + $marks + " verdict=" + $hit)
 }
 
 Write-Output ""
