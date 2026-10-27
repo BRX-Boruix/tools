@@ -2,6 +2,7 @@
 
 import argparse
 import os
+import shlex
 import shutil
 import subprocess
 
@@ -183,6 +184,13 @@ def cmd(args: argparse.Namespace) -> int:
     cmd += config.sound_card_args(silent=silent)
     if args.serial:
         cmd += ["-serial", "stdio"]
+    # 逃生口：`BORUIX_QEMU_EXTRA` 原样追加到 QEMU 命令行（调试用——比如挂 QMP 看
+    # 卡住时各 vCPU 的 RIP/CR3：`-qmp tcp:127.0.0.1:4444,server,nowait`）。
+    # 刻意只做"追加"，不解析、不改写已有参数：调试工具不该改变被测对象。
+    extra_qemu = os.environ.get("BORUIX_QEMU_EXTRA", "").strip()
+    if extra_qemu:
+        cmd += shlex.split(extra_qemu)
+        info("QEMU 额外参数: " + extra_qemu)
     extra = (" + 数据盘 " + os.path.basename(disk_path)) if disk_mode in ("disk", "redisk") else ""
     info("盘策略: " + disk_mode + extra)
     smp_desc = ("SMP " + str(smp_n) + " 核") if smp_n is not None else "单核 (no SMP)"
